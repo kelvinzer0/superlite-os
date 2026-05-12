@@ -190,7 +190,7 @@ class AppLauncher(Gtk.Window):
 
         # Search bar
         self.search_entry = Gtk.SearchEntry()
-        self.search_entry.set_placeholder_text("Search applications...")
+        self.search_entry.set_property("placeholder-text", "Search applications...")
         self.search_entry.add_css_class("launcher-search")
         self.search_entry.connect("search-changed", self._on_search_changed)
         self.search_entry.connect("activate", self._on_activate)
