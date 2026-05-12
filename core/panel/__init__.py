@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..wm.window_manager import WindowManager
+    from ..wm import WindowManager
 
 
 class SystemTray(Gtk.Box):

@@ -375,13 +375,13 @@ class TestBrowserLauncher(unittest.TestCase):
 @unittest.skipUnless(HAS_GTK, "GTK4 not available (need desktop Linux)")
 class TestWindowManager(unittest.TestCase):
     def test_workspace_creation(self):
-        from core.wm.window_manager import Workspace, LayoutMode
+        from core.wm import Workspace, LayoutMode
         ws = Workspace(id=0, name="Test")
         self.assertEqual(ws.layout, LayoutMode.TILING)
         self.assertEqual(len(ws.windows), 0)
 
     def test_window_entry(self):
-        from core.wm.window_manager import WindowEntry
+        from core.wm import WindowEntry
         entry = WindowEntry(window=None, app_id="test", title="Test")
         self.assertFalse(entry.focused)
         self.assertFalse(entry.minimized)
@@ -391,7 +391,7 @@ class TestWindowManager(unittest.TestCase):
 @unittest.skipUnless(HAS_GTK, "GTK4 not available (need desktop Linux)")
 class TestAppEntry(unittest.TestCase):
     def test_app_entry(self):
-        from core.launcher.launcher import AppEntry
+        from core.launcher import AppEntry
         app = AppEntry(name="Terminal", exec_cmd="superlite-terminal",
                        icon="utilities-terminal", description="System terminal", category="System")
         self.assertEqual(app.name, "Terminal")

@@ -9,8 +9,8 @@ import argparse
 from dataclasses import dataclass
 from typing import Optional
 
-from ..drivers.dump import DriverDump
-from ..drivers.crosschain import CrossChainBuilder, BuildConfig
+from drivers.dump import DriverDump
+from drivers.crosschain import CrossChainBuilder, BuildConfig
 
 
 @dataclass

@@ -9,9 +9,9 @@ import os
 import subprocess
 from typing import Optional
 
-from ..wm.window_manager import WindowManager
-from ..panel.panel import Panel
-from ..launcher.launcher import AppLauncher, AppEntry
+from ..wm import WindowManager
+from ..panel import Panel
+from ..launcher import AppLauncher, AppEntry
 
 
 class Session:
