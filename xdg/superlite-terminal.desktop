@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Terminal
+Comment=SuperLite Terminal Emulator
+Exec=superlite-terminal
+Icon=utilities-terminal
+Type=Application
+Categories=System;TerminalEmulator;
+Keywords=terminal;shell;prompt;command;

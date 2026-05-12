@@ -55,8 +55,21 @@ class WindowManager:
         self.windows: list[WindowEntry] = []
         self.focused: Optional[WindowEntry] = None
 
+    def _get_screen_size(self) -> tuple[int, int]:
+        """Query actual display geometry. Falls back to 1280x720."""
+        try:
+            if self.display:
+                monitors = self.display.get_monitors()
+                if monitors and monitors.get_n_items() > 0:
+                    monitor = monitors.get_item(0)
+                    geo = monitor.get_geometry()
+                    return geo.width, geo.height
+        except Exception:
+            pass
+        return 1280, 720
+
     def register_window(self, window: Gtk.Window, app_id: str, title: str = "") -> WindowEntry:
-        """Register a new window with the WM."""
+        """Register a new window with the WM and apply tiling layout."""
         entry = WindowEntry(
             window=window,
             app_id=app_id,
@@ -66,18 +79,29 @@ class WindowManager:
         self.windows.append(entry)
         self.workspaces[self.current_workspace].windows.append(entry)
 
-        # Track window close
+        # Track window close — return False to allow the window to actually close
         window.connect("close-request", lambda w: self.unregister_window(w))
 
         self._focus(entry)
         self._relayout()
+
+        # Apply computed geometry to the GTK window
+        entry.window.set_default_size(entry.width, entry.height)
+        try:
+            # GTK4: move via surface if available
+            surface = entry.window.get_surface()
+            if surface is not None:
+                surface.set_position(entry.x, entry.y)
+        except (AttributeError, TypeError):
+            pass
+
         return entry
 
-    def unregister_window(self, window: Gtk.Window):
-        """Remove a window from WM tracking."""
+    def unregister_window(self, window: Gtk.Window) -> bool:
+        """Remove a window from WM tracking. Returns False to allow close."""
         entry = self._find_entry(window)
         if not entry:
-            return
+            return False
         self.windows.remove(entry)
         ws = self.workspaces[entry.workspace]
         if entry in ws.windows:
@@ -87,6 +111,7 @@ class WindowManager:
             if ws.windows:
                 self._focus(ws.windows[-1])
         self._relayout()
+        return False  # Allow the window to close
 
     def _find_entry(self, window: Gtk.Window) -> Optional[WindowEntry]:
         for w in self.windows:
@@ -102,6 +127,98 @@ class WindowManager:
         self.focused = entry
         entry.window.present()
 
+    def _switch_workspace(self, workspace_id: int):
+        """Switch to a different workspace, hiding/showing windows."""
+        if workspace_id < 0 or workspace_id >= self.WORKSPACE_COUNT:
+            return
+        if workspace_id == self.current_workspace:
+            return
+
+        old_ws = self.workspaces[self.current_workspace]
+        new_ws = self.workspaces[workspace_id]
+
+        # Hide windows from old workspace
+        for entry in old_ws.windows:
+            if not entry.minimized:
+                entry.window.set_visible(False)
+
+        self.current_workspace = workspace_id
+
+        # Show windows in new workspace
+        for entry in new_ws.windows:
+            if not entry.minimized:
+                entry.window.set_visible(True)
+
+        # Focus the last window in new workspace (if any)
+        if new_ws.windows:
+            self._focus(new_ws.windows[-1])
+        else:
+            self.focused = None
+
+        self._relayout()
+
+    def focus_next(self):
+        """Cycle focus to next window in current workspace."""
+        ws = self.workspaces[self.current_workspace]
+        visible = [w for w in ws.windows if not w.minimized]
+        if len(visible) <= 1:
+            return
+        if self.focused in visible:
+            idx = visible.index(self.focused)
+            self._focus(visible[(idx + 1) % len(visible)])
+        elif visible:
+            self._focus(visible[0])
+
+    def focus_prev(self):
+        """Cycle focus to previous window in current workspace."""
+        ws = self.workspaces[self.current_workspace]
+        visible = [w for w in ws.windows if not w.minimized]
+        if len(visible) <= 1:
+            return
+        if self.focused in visible:
+            idx = visible.index(self.focused)
+            self._focus(visible[(idx - 1) % len(visible)])
+        elif visible:
+            self._focus(visible[-1])
+
+    def close_focused(self):
+        """Close the currently focused window."""
+        if self.focused:
+            self.focused.window.close()
+
+    def toggle_maximize_focused(self):
+        """Toggle maximize on focused window."""
+        if not self.focused:
+            return
+        win = self.focused.window
+        if win.is_maximized():
+            win.unmaximize()
+        else:
+            win.maximize()
+
+    def minimize_focused(self):
+        """Minimize the focused window."""
+        if self.focused:
+            self.focused.minimized = True
+            self.focused.window.set_visible(False)
+            self.focused = None
+            ws = self.workspaces[self.current_workspace]
+            visible = [w for w in ws.windows if not w.minimized]
+            if visible:
+                self._focus(visible[-1])
+            self._relayout()
+
+    def toggle_floating_focused(self):
+        """Toggle floating/tiling for focused window."""
+        if not self.focused:
+            return
+        ws = self.workspaces[self.current_workspace]
+        if ws.layout == LayoutMode.TILING:
+            ws.layout = LayoutMode.FLOATING
+        else:
+            ws.layout = LayoutMode.TILING
+        self._relayout()
+
     def _relayout(self):
         """Recompute window positions based on current layout."""
         ws = self.workspaces[self.current_workspace]
@@ -111,12 +228,21 @@ class WindowManager:
 
         if ws.layout == LayoutMode.TILING:
             self._tile(visible)
+            # Apply positions to all visible windows
+            for entry in visible:
+                entry.window.set_default_size(entry.width, entry.height)
+                try:
+                    surface = entry.window.get_surface()
+                    if surface is not None:
+                        surface.set_position(entry.x, entry.y)
+                except (AttributeError, TypeError):
+                    pass
 
     def _tile(self, windows: list[WindowEntry]):
         """Tile windows in master-stack layout."""
         if not windows:
             return
-        screen_w, screen_h = 1280, 720
+        screen_w, screen_h = self._get_screen_size()
         panel_height = 36
         usable_h = screen_h - panel_height
         gap = self.GAP

@@ -7,6 +7,7 @@ from gi.repository import Gtk, Gdk, GLib
 _CSS_DONE = False
 
 def _ensure_css():
+    """Load CSS using theme variables. Call AFTER GTK display and theme are ready."""
     global _CSS_DONE
     if _CSS_DONE:
         return
@@ -14,10 +15,31 @@ def _ensure_css():
     if not d:
         return
     _CSS_DONE = True
-    css = b"""
+
+    try:
+        from core.theme import get_theme
+        t = get_theme()
+        vars_css = t.to_css_vars()
+    except ImportError:
+        # Fallback if theme module not available
+        vars_css = """
+        @define-color sl-bg #0f0f23;
+        @define-color sl-fg #e0e0f0;
+        @define-color sl-accent #e94560;
+        @define-color sl-surface #1a1a2e;
+        @define-color sl-surface-alt #16213e;
+        @define-color sl-border #0f3460;
+        @define-color sl-success #4ecca3;
+        @define-color sl-warning #f0c040;
+        @define-color sl-text-dim #808090;
+        @define-color sl-text-mid #a0a0b0;
+        @define-color sl-text-bright #e0e0f0;
+        """
+
+    css = vars_css.encode() + b"""
     .sl-titlebar {
-        background: #1a1a2e;
-        border-bottom: 1px solid #16213e;
+        background: @sl-surface;
+        border-bottom: 1px solid @sl-surface-alt;
         padding: 0 4px;
         min-height: 32px;
     }
@@ -26,7 +48,7 @@ def _ensure_css():
         margin-right: 8px;
     }
     .sl-titlebar-label {
-        color: #e0e0f0;
+        color: @sl-text-bright;
         font-size: 12px;
         font-weight: bold;
     }
@@ -40,43 +62,43 @@ def _ensure_css():
         font-size: 13px;
     }
     .sl-titlebar-btn:hover {
-        background: #16213e;
+        background: @sl-surface-alt;
     }
     .sl-btn-close:hover {
-        background: #e94560;
+        background: @sl-accent;
         color: white;
     }
     .sl-btn-minimize:hover {
-        background: #f0c040;
-        color: #1a1a2e;
+        background: @sl-warning;
+        color: @sl-surface;
     }
     .sl-btn-maximize:hover {
-        background: #4ecca3;
-        color: #1a1a2e;
+        background: @sl-success;
+        color: @sl-surface;
     }
     .sl-btn-min {
-        background: #f0c040;
+        background: @sl-warning;
         border-radius: 50%;
         min-width: 12px;
         min-height: 12px;
         margin: 2px;
     }
     .sl-btn-max {
-        background: #4ecca3;
+        background: @sl-success;
         border-radius: 50%;
         min-width: 12px;
         min-height: 12px;
         margin: 2px;
     }
     .sl-btn-cls {
-        background: #e94560;
+        background: @sl-accent;
         border-radius: 50%;
         min-width: 12px;
         min-height: 12px;
         margin: 2px;
     }
     .sl-separator {
-        background: #16213e;
+        background: @sl-surface-alt;
         min-width: 1px;
         min-height: 20px;
         margin: 0 4px;
@@ -153,7 +175,7 @@ def apply_titlebar(window: Gtk.Window, icon: str = "⚡", title: str = None):
     title_label.set_ellipsize(3)  # Pango.EllipsizeMode.END
     titlebar.append(title_label)
     
-    # Make titlebar draggable
+    # Make titlebar draggable — GTK4 uses begin_move_drag on the surface
     drag = Gtk.GestureDrag()
     drag.connect("drag-begin", lambda g, x, y: _start_drag(window, g, x, y))
     titlebar.add_controller(drag)
@@ -174,8 +196,18 @@ def _toggle_maximize(window: Gtk.Window, btn: Gtk.Button):
         window.maximize()
 
 
-def _start_drag(window, gesture, x, y):
-    """Initiate window drag from titlebar."""
-    # In GTK4, window dragging from titlebar is handled by set_titlebar()
-    # This is a fallback for custom drag handling
-    pass
+def _start_drag(window: Gtk.Window, gesture: Gtk.GestureDrag, x: float, y: float):
+    """Initiate window drag from titlebar using GTK4 surface API."""
+    try:
+        surface = window.get_surface()
+        if surface is not None:
+            # begin_move_drag takes: button, x_root, y_root, timestamp
+            # Use button 1 (left click), and get the event sequence timestamp
+            device = gesture.get_device()
+            event = gesture.get_last_event(None)
+            timestamp = event.get_time() if event else 0
+            surface.begin_move_drag(device, 1, x, y, timestamp)
+    except (AttributeError, TypeError):
+        # Fallback: GTK4's set_titlebar() handles drag automatically
+        # when decorations are disabled — this is just a safety net
+        pass

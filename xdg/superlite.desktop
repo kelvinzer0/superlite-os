@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=SuperLite
+Comment=SuperLite OS Desktop Environment
+Exec=/opt/superlite-os/run-superlite.sh
+Type=Application
+DesktopNames=SuperLite

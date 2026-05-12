@@ -5,6 +5,8 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib
 from dataclasses import dataclass
 from typing import Callable, Optional
+import os
+import glob
 
 
 @dataclass
@@ -14,6 +16,7 @@ class AppEntry:
     icon: str = "application-x-executable"
     description: str = ""
     category: str = "Other"
+    desktop_file: str = ""
 
 
 # Launcher CSS — loaded once via ensure_css()
@@ -29,34 +32,51 @@ def ensure_css():
         return
     _LAUNCHER_CSS_LOADED = True
 
-    css = b"""
+    try:
+        from core.theme import get_theme
+        t = get_theme()
+        vars_css = t.to_css_vars()
+    except ImportError:
+        vars_css = """
+        @define-color sl-bg #0f0f23;
+        @define-color sl-fg #e0e0f0;
+        @define-color sl-accent #e94560;
+        @define-color sl-surface #1a1a2e;
+        @define-color sl-surface-alt #16213e;
+        @define-color sl-border #0f3460;
+        @define-color sl-text-dim #808090;
+        @define-color sl-text-bright #e0e0f0;
+        @define-color sl-caret #e94560;
+        """
+
+    css = vars_css.encode() + b"""
     .launcher-overlay {
         background: rgba(0, 0, 0, 0.6);
     }
     .launcher {
-        background: #1a1a2e;
-        border: 2px solid #e94560;
+        background: @sl-surface;
+        border: 2px solid @sl-accent;
         border-radius: 12px;
         padding: 16px;
     }
     .launcher-search {
-        background: #16213e;
-        color: #e0e0f0;
-        border: 1px solid #0f3460;
+        background: @sl-surface-alt;
+        color: @sl-text-bright;
+        border: 1px solid @sl-border;
         border-radius: 8px;
         padding: 12px 16px;
         font-size: 16px;
-        caret-color: #e94560;
+        caret-color: @sl-caret;
     }
     .launcher-item {
         background: transparent;
         border: none;
         border-radius: 6px;
         padding: 8px 12px;
-        color: #e0e0f0;
+        color: @sl-text-bright;
     }
     .launcher-item:hover, .launcher-item-selected {
-        background: #16213e;
+        background: @sl-surface-alt;
     }
     .launcher-item-name {
         font-weight: bold;
@@ -64,7 +84,7 @@ def ensure_css():
     }
     .launcher-item-desc {
         font-size: 11px;
-        color: #808090;
+        color: @sl-text-dim;
     }
     """
     provider = Gtk.CssProvider()
@@ -76,12 +96,80 @@ def ensure_css():
     )
 
 
+def _parse_desktop_file(path: str) -> Optional[AppEntry]:
+    """Parse a .desktop file into an AppEntry."""
+    try:
+        data = {}
+        in_desktop_entry = False
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if line == "[Desktop Entry]":
+                    in_desktop_entry = True
+                    continue
+                if line.startswith("["):
+                    in_desktop_entry = False
+                    continue
+                if in_desktop_entry and "=" in line:
+                    key, _, value = line.partition("=")
+                    data[key.strip()] = value.strip()
+
+        # Skip if NoDisplay or not an application
+        if data.get("NoDisplay", "false").lower() == "true":
+            return None
+        if data.get("Type", "") != "Application":
+            return None
+        if "Name" not in data or "Exec" not in data:
+            return None
+
+        # Clean Exec: remove field codes %f %u %F %U etc.
+        exec_cmd = data["Exec"]
+        for code in ["%f", "%u", "%F", "%U", "%d", "%D", "%n", "%N", "%i", "%c", "%k", "%v", "%m"]:
+            exec_cmd = exec_cmd.replace(code, "")
+        exec_cmd = exec_cmd.strip()
+
+        return AppEntry(
+            name=data.get("Name", ""),
+            exec_cmd=exec_cmd,
+            icon=data.get("Icon", "application-x-executable"),
+            description=data.get("Comment", data.get("GenericName", "")),
+            category=data.get("Categories", "Other").split(";")[0] if data.get("Categories") else "Other",
+            desktop_file=path,
+        )
+    except (OSError, KeyError, ValueError):
+        return None
+
+
+def scan_desktop_files() -> list[AppEntry]:
+    """Scan XDG data dirs for .desktop files."""
+    entries = []
+    data_dirs = os.environ.get("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
+    data_dirs.append(os.path.expanduser("~/.local/share"))
+    data_dirs.append("/usr/share")  # Ensure we always check this
+
+    seen = set()
+    for data_dir in data_dirs:
+        pattern = os.path.join(data_dir, "applications", "*.desktop")
+        for path in glob.glob(pattern):
+            basename = os.path.basename(path)
+            if basename in seen:
+                continue
+            seen.add(basename)
+            entry = _parse_desktop_file(path)
+            if entry:
+                entries.append(entry)
+
+    # Sort by name
+    entries.sort(key=lambda e: e.name.lower())
+    return entries
+
+
 class AppLauncher(Gtk.Window):
     """Overlay-style application launcher with search."""
 
     def __init__(self, apps: Optional[list[AppEntry]] = None):
         super().__init__()
-        self.apps = apps or self._default_apps()
+        self.apps = apps or self._load_apps()
         self.on_launch: Optional[Callable[[AppEntry], None]] = None
 
         self.set_title("Launcher")
@@ -129,6 +217,20 @@ class AppLauncher(Gtk.Window):
 
         # Initial display
         self._on_search_changed(self.search_entry)
+
+    def _load_apps(self) -> list[AppEntry]:
+        """Load apps from .desktop files, falling back to built-in defaults."""
+        apps = scan_desktop_files()
+        if not apps:
+            apps = self._default_apps()
+        # Always ensure built-in apps are present
+        builtin_names = {"superlite-terminal", "superlite-files", "superlite-editor"}
+        existing_cmds = {a.exec_cmd.split()[0] for a in apps if a.exec_cmd}
+        for builtin in self._default_apps():
+            cmd_base = builtin.exec_cmd.split()[0]
+            if cmd_base not in existing_cmds:
+                apps.append(builtin)
+        return apps
 
     def _default_apps(self) -> list[AppEntry]:
         return [
@@ -187,10 +289,12 @@ class AppLauncher(Gtk.Window):
         elif keyval == Gdk.KEY_Down:
             self._selected_idx = min(self._selected_idx + 1, len(self._buttons) - 1)
             self._update_selection()
+            self._scroll_to_selected()
             return True
         elif keyval == Gdk.KEY_Up:
             self._selected_idx = max(self._selected_idx - 1, 0)
             self._update_selection()
+            self._scroll_to_selected()
             return True
         elif keyval == Gdk.KEY_Return:
             if self._filtered:
@@ -209,6 +313,27 @@ class AppLauncher(Gtk.Window):
                 btn.grab_focus()
             else:
                 btn.remove_css_class("launcher-item-selected")
+
+    def _scroll_to_selected(self):
+        """Scroll the results list so the selected item is visible."""
+        if 0 <= self._selected_idx < len(self._buttons):
+            btn = self._buttons[self._selected_idx]
+            # Use GLib.idle_add to ensure the widget is allocated before scrolling
+            GLib.idle_add(lambda: self._do_scroll(btn))
+
+    def _do_scroll(self, btn: Gtk.Button) -> bool:
+        """Actually scroll to the button's allocation."""
+        try:
+            adj = self.scrolled.get_vadjustment()
+            alloc = btn.get_allocation()
+            if alloc.height > 0:
+                # Scroll so the button is centered in the viewport
+                page_size = adj.get_page_size()
+                target = alloc.y - (page_size - alloc.height) / 2
+                adj.set_value(max(0, target))
+        except Exception:
+            pass
+        return False  # Don't repeat
 
     def _launch(self, app: AppEntry):
         if self.on_launch:
