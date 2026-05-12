@@ -170,12 +170,8 @@ kill $OB_PID 2>/dev/null
 XINITRC
 chmod +x "$ROOTFS/usr/share/superlite/xinitrc"
 
-# .bash_profile — auto-start X
-cat > "$ROOTFS/root/.bash_profile" << 'BPROFILE'
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec startx
-fi
-BPROFILE
+# No .bash_profile — systemd superlite-x.service handles X startup
+# Having both causes drmSetMaster conflict (two X servers on same VT)
 
 # Systemd service for X
 cat > "$ROOTFS/etc/systemd/system/superlite-x.service" << 'SERVICE'

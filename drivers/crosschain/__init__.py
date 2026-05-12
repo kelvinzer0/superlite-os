@@ -336,14 +336,8 @@ class CrossChainBuilder:
             f.write("kill $OB_PID 2>/dev/null\n")
         os.chmod(xinitrc, 0o755)
 
-        # .bash_profile — auto-start X on tty1
-        bash_profile = os.path.join(rootfs, "root/.bash_profile")
-        os.makedirs(os.path.dirname(bash_profile), exist_ok=True)
-        with open(bash_profile, "w") as f:
-            f.write("# Auto-start X on tty1\n")
-            f.write('if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then\n')
-            f.write("    exec startx\n")
-            f.write("fi\n")
+        # No .bash_profile — systemd superlite-x.service handles X startup
+        # Having both causes drmSetMaster conflict (two X servers on same VT)
 
         # Systemd service: start X on tty1 after auto-login
         service_dir = os.path.join(rootfs, "etc/systemd/system")
