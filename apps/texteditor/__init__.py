@@ -5,6 +5,8 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, Gio, GLib, Pango
 import os
 
+from core.decorations import apply_titlebar
+
 _CSS_DONE = False
 
 def _ensure_css():
@@ -39,6 +41,7 @@ class TextEditorWindow(Gtk.Window):
         self.current_file = None
         self.modified = False
         _ensure_css()
+        apply_titlebar(self, icon="📝", title="Text Editor")
 
         main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.set_child(main)

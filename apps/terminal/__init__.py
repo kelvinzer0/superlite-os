@@ -10,6 +10,8 @@ import pty
 import select
 import signal
 
+from core.decorations import apply_titlebar
+
 _CSS_DONE = False
 
 def _ensure_css():
@@ -43,7 +45,7 @@ class TerminalWindow(Gtk.Window):
         self._child_pid = None
 
         _ensure_css()
-        self.add_css_class("terminal-window")
+        apply_titlebar(self, icon="🖥️", title="Terminal")
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.set_child(box)

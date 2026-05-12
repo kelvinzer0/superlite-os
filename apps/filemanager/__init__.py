@@ -6,6 +6,8 @@ from gi.repository import Gtk, Gdk, Gio, GLib, Pango
 import os
 from pathlib import Path
 
+from core.decorations import apply_titlebar
+
 _CSS_DONE = False
 
 def _ensure_css():
@@ -58,6 +60,7 @@ class FileManagerWindow(Gtk.Window):
         self.set_default_size(1000, 650)
         self.current_path = os.path.expanduser(path or "~")
         _ensure_css()
+        apply_titlebar(self, icon="📁", title="Files")
 
         main = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         self.set_child(main)
