@@ -176,6 +176,8 @@ mount -t tmpfs tmpfs /dev/shm 2>/dev/null
 mount -t tmpfs tmpfs /run 2>/dev/null
 
 echo ""
+echo "[init] Mounting virtual filesystems..."
+echo ""
 echo "  ╔══════════════════════════════════╗"
 echo "  ║     ⚡ SuperLite OS v0.1.0       ║"
 echo "  ║   Ultra-lightweight Linux DE     ║"
