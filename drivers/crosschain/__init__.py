@@ -141,7 +141,7 @@ class CrossChainBuilder:
             "--arch", self.config.target_arch,
             "--variant=minbase",
             "--include", ",".join(self.config.include_packages[:5]),  # First 5
-            "--exclude", ",".join(self.config.exclude_packages),
+            "--exclude", ",".join(self.config.exclude_packages + ["polkitd"]),
             self.config.base_release,
             rootfs,
         ]

@@ -50,14 +50,31 @@ if [ ! -d "$ROOTFS/usr" ]; then
     debootstrap \
         --arch amd64 \
         --variant=minbase \
-        --include systemd,systemd-sysv,dbus,dbus-x11,xorg,xserver-xorg-video-all,xserver-xorg-input-all,openbox,xinit,gir1.2-gtk-4.0,python3-gi,python3-gi-cairo,python3,python3-psutil,network-manager,pciutils,usbutils,bash,coreutils,util-linux,nano \
-        --exclude man-db,manpages,info,doc-debian \
+        --include systemd,systemd-sysv,dbus,dbus-x11,xorg,xserver-xorg-video-all,xserver-xorg-input-all,openbox,xinit,gir1.2-gtk-4.0,python3-gi,python3-gi-cairo,python3,python3-psutil,pciutils,usbutils,bash,coreutils,util-linux,nano \
+        --exclude man-db,manpages,info,doc-debian,polkitd \
         bookworm \
         "$ROOTFS" \
         http://deb.debian.org/debian
 else
     echo "  → Rootfs exists, skipping debootstrap"
 fi
+
+# Ensure systemd is installed (may have been removed during debootstrap)
+echo "  Verifying systemd..."
+if [ ! -e "$ROOTFS/sbin/init" ] || [ ! -e "$ROOTFS/lib/systemd/systemd" ]; then
+    echo "  Installing systemd + deps via chroot..."
+    mount --bind /dev "$ROOTFS/dev" 2>/dev/null
+    mount --bind /proc "$ROOTFS/proc" 2>/dev/null
+    mount --bind /sys "$ROOTFS/sys" 2>/dev/null
+    mount --bind /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null
+    chroot "$ROOTFS" bash -c "
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq 2>/dev/null
+apt-get install -y -qq systemd systemd-sysv linux-image-amd64 grub-pc 2>&1 | tail -3
+" 2>&1
+    umount "$ROOTFS/dev" "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/etc/resolv.conf" 2>/dev/null
+fi
+ls -la "$ROOTFS/sbin/init" 2>/dev/null || echo "  WARNING: /sbin/init still missing!"
 
 # ─── Step 3: Inject drivers + install DE ────────────────
 echo ""
@@ -239,12 +256,23 @@ echo "  Copying rootfs..."
 cp -a "$ROOTFS/." "$MNT/"
 
 echo "  Installing GRUB..."
-mount --bind /dev "$MNT/dev"
-mount --bind /proc "$MNT/proc"
-mount --bind /sys "$MNT/sys"
-chroot "$MNT" grub-install --target=i386-pc --boot-directory=/boot "$LOOP" 2>&1 | tail -2
-chroot "$MNT" update-grub 2>&1 | tail -2
-umount "$MNT/dev" "$MNT/proc" "$MNT/sys"
+# Install GRUB modules into image
+mkdir -p "$MNT/boot/grub/i386-pc"
+cp -r /usr/lib/grub/i386-pc/* "$MNT/boot/grub/i386-pc/" 2>/dev/null
+
+# Generate grub.cfg
+KVER=$(ls "$MNT/boot/vmlinuz-"* 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/vmlinuz-//')
+cat > "$MNT/boot/grub/grub.cfg" << GRCFG
+set default=0
+set timeout=3
+menuentry 'SuperLite OS' {
+    linux /boot/vmlinuz-${KVER} root=/dev/sda1 ro quiet
+    initrd /boot/initrd.img-${KVER}
+}
+GRCFG
+
+# Install GRUB to MBR from host
+grub-install --target=i386-pc --boot-directory="$MNT/boot" "$LOOP" 2>&1 | tail -2
 
 umount "$MNT"
 losetup -d "$LOOP"
