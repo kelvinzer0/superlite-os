@@ -1,0 +1,106 @@
+{
+  "wm": {
+    "gap": 4,
+    "border_width": 2,
+    "workspaces": 4,
+    "layout": "tiling",
+    "keybindings": {
+      "toggle_layout": "Super+Return",
+      "close_window": "Super+q",
+      "focus_next": "Super+j",
+      "focus_prev": "Super+k",
+      "toggle_maximize": "Super+f",
+      "minimize": "Super+m",
+      "toggle_floating": "Super+space",
+      "switch_ws_1": "Super+1",
+      "switch_ws_2": "Super+2",
+      "switch_ws_3": "Super+3",
+      "switch_ws_4": "Super+4",
+      "launcher": "Super+Return",
+      "terminal": "Super+Return",
+      "file_manager": "Super+e",
+      "text_editor": "Super+n",
+      "browser": "Super+b",
+      "screenshot": "Print"
+    }
+  },
+  "panel": {
+    "position": "top",
+    "height": 36,
+    "show_battery": true,
+    "show_clock": true,
+    "clock_format": "%H:%M:%S  %d/%m/%Y",
+    "show_workspaces": true,
+    "show_window_list": true
+  },
+  "theme": {
+    "name": "midnight",
+    "bg": "#0f0f23",
+    "fg": "#e0e0f0",
+    "accent": "#e94560",
+    "accent_hover": "#ff6b81",
+    "surface": "#1a1a2e",
+    "surface_alt": "#16213e",
+    "border": "#0f3460",
+    "success": "#4ecca3",
+    "warning": "#f0c040",
+    "error": "#e94560",
+    "info": "#22d3ee"
+  },
+  "terminal": {
+    "font": "Monospace 11",
+    "scrollback_lines": 10000,
+    "cursor_style": "block",
+    "cursor_blink": true,
+    "colors": {
+      "bg": "#0f0f23",
+      "fg": "#e0e0f0",
+      "cursor": "#e94560",
+      "black": "#1a1a2e",
+      "red": "#e94560",
+      "green": "#4ecca3",
+      "yellow": "#f0c040",
+      "blue": "#0f3460",
+      "magenta": "#a855f7",
+      "cyan": "#22d3ee",
+      "white": "#e0e0f0"
+    }
+  },
+  "filemanager": {
+    "show_hidden": false,
+    "sort_dirs_first": true,
+    "view_mode": "list",
+    "bookmarks": [
+      {"name": "Home", "path": "~"},
+      {"name": "Documents", "path": "~/Documents"},
+      {"name": "Downloads", "path": "~/Downloads"},
+      {"name": "Pictures", "path": "~/Pictures"}
+    ]
+  },
+  "editor": {
+    "font": "Monospace 13",
+    "tab_width": 4,
+    "show_line_numbers": true,
+    "word_wrap": false,
+    "auto_indent": true,
+    "highlight_current_line": true
+  },
+  "browser": {
+    "default_browser": "google-chrome",
+    "flags": [
+      "--no-first-run",
+      "--disable-sync",
+      "--disk-cache-size=52428800"
+    ]
+  },
+  "build": {
+    "target_arch": "x86_64",
+    "base_distro": "debian",
+    "base_release": "bookworm",
+    "hostname": "superlite",
+    "timezone": "UTC",
+    "locale": "en_US.UTF-8",
+    "image_size_mb": 2048,
+    "boot_mode": "uefi"
+  }
+}
