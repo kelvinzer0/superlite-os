@@ -28,13 +28,15 @@ class BuildConfig:
     include_packages: list[str] = field(default_factory=lambda: [
         "systemd", "systemd-sysv",
         "dbus", "dbus-x11",
-        "xorg", "xserver-xorg-video-all",
-        "gtk-3-examples", "gir1.2-gtk-4.0", "python3-gi",
-        "python3", "python3-pip",
+        "xorg", "xserver-xorg-video-all", "xserver-xorg-input-all",
+        "openbox", "xinit",
+        "gir1.2-gtk-4.0", "python3-gi", "python3-gi-cairo",
+        "python3", "python3-pip", "python3-psutil",
         "network-manager", "wpasupplicant",
         "pulseaudio", "alsa-utils",
         "bash", "coreutils", "util-linux",
         "nano", "vim-tiny",
+        "pciutils", "usbutils",
     ])
     exclude_packages: list[str] = field(default_factory=lambda: [
         "man-db", "manpages", "info",
@@ -239,28 +241,37 @@ class CrossChainBuilder:
 
         # Copy SuperLite source
         src_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        for item in ["core", "apps", "drivers", "assets"]:
+        for item in ["core", "apps", "drivers", "assets", "utils"]:
             src = os.path.join(src_dir, item)
             dst = os.path.join(superlite_dest, item)
             if os.path.isdir(src):
                 shutil.copytree(src, dst, dirs_exist_ok=True)
 
         # Copy main entry point
-        main_py = os.path.join(src_dir, "__init__.py")
-        if os.path.isfile(main_py):
-            shutil.copy2(main_py, os.path.join(superlite_dest, "__init__.py"))
+        for fname in ["__init__.py", "__main__.py"]:
+            main_py = os.path.join(src_dir, fname)
+            if os.path.isfile(main_py):
+                shutil.copy2(main_py, os.path.join(superlite_dest, fname))
 
-        # Create session starter script
+        # Copy default config
+        config_src = os.path.join(src_dir, "build", "configs", "default.json")
+        config_dest_dir = os.path.join(rootfs, "etc/superlite")
+        if os.path.isfile(config_src):
+            os.makedirs(config_dest_dir, exist_ok=True)
+            shutil.copy2(config_src, os.path.join(config_dest_dir, "config.json"))
+
+        # Session launcher script
         session_script = os.path.join(rootfs, "usr/bin/superlite-session")
         with open(session_script, "w") as f:
             f.write("#!/bin/bash\n")
             f.write("export XDG_CURRENT_DESKTOP=SuperLite\n")
             f.write("export DESKTOP_SESSION=superlite\n")
+            f.write("export PYTHONPATH=/usr/share/superlite\n")
             f.write("cd /usr/share/superlite\n")
             f.write("exec python3 -m core.session\n")
         os.chmod(session_script, 0o755)
 
-        # Create app launchers
+        # App launchers
         for app_name, module in [
             ("superlite-terminal", "apps.terminal"),
             ("superlite-files", "apps.filemanager"),
@@ -276,7 +287,7 @@ class CrossChainBuilder:
         return True
 
     def _stage_configure(self):
-        """Configure system files."""
+        """Configure system files for auto-boot into DE."""
         rootfs = os.path.join(self.workspace, "rootfs")
 
         # /etc/hostname
@@ -295,29 +306,93 @@ class CrossChainBuilder:
             f.write("sysfs\tsysfs\tsysfs\tdefaults\t0\t0\n")
             f.write("tmpfs\t/tmp\ttmpfs\tdefaults,noatime\t0\t0\n")
 
-        # /etc/inittab (systemd is default, but add fallback)
-        # SuperLite session auto-start
-        autostart_dir = os.path.join(rootfs, "etc/systemd/system")
-        os.makedirs(autostart_dir, exist_ok=True)
+        # Auto-login on tty1
+        getty_dir = os.path.join(rootfs, "etc/systemd/system/getty@tty1.service.d")
+        os.makedirs(getty_dir, exist_ok=True)
+        with open(os.path.join(getty_dir, "autologin.conf"), "w") as f:
+            f.write("[Service]\n")
+            f.write("ExecStart=\n")
+            f.write("ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM\n")
 
-        service = os.path.join(autostart_dir, "superlite-session.service")
-        with open(service, "w") as f:
+        # X init script — starts openbox WM + SuperLite DE
+        xinitrc = os.path.join(rootfs, "usr/share/superlite/xinitrc")
+        os.makedirs(os.path.dirname(xinitrc), exist_ok=True)
+        with open(xinitrc, "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write("export DISPLAY=:0\n")
+            f.write("export XDG_CURRENT_DESKTOP=SuperLite\n")
+            f.write("export PYTHONPATH=/usr/share/superlite\n\n")
+            f.write("# Background\n")
+            f.write('xsetroot -solid "#0f0f23" 2>/dev/null &\n\n')
+            f.write("# Openbox WM\n")
+            f.write("openbox &\n")
+            f.write("OB_PID=$!\n")
+            f.write("sleep 1\n\n")
+            f.write("# SuperLite DE\n")
+            f.write("cd /usr/share/superlite\n")
+            f.write("python3 -m core.session &\n")
+            f.write("DE_PID=$!\n\n")
+            f.write("wait $DE_PID\n")
+            f.write("kill $OB_PID 2>/dev/null\n")
+        os.chmod(xinitrc, 0o755)
+
+        # .bash_profile — auto-start X on tty1
+        bash_profile = os.path.join(rootfs, "root/.bash_profile")
+        os.makedirs(os.path.dirname(bash_profile), exist_ok=True)
+        with open(bash_profile, "w") as f:
+            f.write("# Auto-start X on tty1\n")
+            f.write('if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then\n')
+            f.write("    exec startx\n")
+            f.write("fi\n")
+
+        # Systemd service: start X on tty1 after auto-login
+        service_dir = os.path.join(rootfs, "etc/systemd/system")
+        os.makedirs(service_dir, exist_ok=True)
+
+        service_path = os.path.join(service_dir, "superlite-x.service")
+        with open(service_path, "w") as f:
             f.write("[Unit]\n")
-            f.write("Description=SuperLite Desktop Session\n")
-            f.write("After=systemd-user-sessions.service\n")
-            f.write("ConditionPathExists=/usr/bin/superlite-session\n\n")
+            f.write("Description=SuperLite Desktop (X)\n")
+            f.write("After=getty@tty1.service\n")
+            f.write("ConditionPathExists=/usr/share/superlite/xinitrc\n\n")
             f.write("[Service]\n")
             f.write("Type=simple\n")
-            f.write("ExecStart=/usr/bin/superlite-session\n")
+            f.write("User=root\n")
+            f.write("Environment=DISPLAY=:0\n")
+            f.write("Environment=XDG_VTNR=1\n")
+            f.write("WorkingDirectory=/root\n")
+            f.write("ExecStartPre=/bin/sleep 2\n")
+            f.write("ExecStart=/usr/bin/xinit /usr/share/superlite/xinitrc -- :0 vt1 -keeptty -nolisten tcp\n")
             f.write("Restart=on-failure\n")
-            f.write("User=root\n\n")
+            f.write("RestartSec=5\n\n")
             f.write("[Install]\n")
             f.write("WantedBy=multi-user.target\n")
 
         # Enable the service
-        wants_dir = os.path.join(autostart_dir, "multi-user.target.wants")
+        wants_dir = os.path.join(service_dir, "multi-user.target.wants")
         os.makedirs(wants_dir, exist_ok=True)
-        os.symlink(service, os.path.join(wants_dir, "superlite-session.service"))
+        target = os.path.join(wants_dir, "superlite-x.service")
+        if not os.path.exists(target):
+            os.symlink("/etc/systemd/system/superlite-x.service", target)
+
+        # Xorg config for QEMU / generic VGA
+        x11_dir = os.path.join(rootfs, "etc/X11")
+        os.makedirs(x11_dir, exist_ok=True)
+        with open(os.path.join(x11_dir, "xorg.conf"), "w") as f:
+            f.write('Section "Device"\n')
+            f.write('    Identifier "Default VGA"\n')
+            f.write('    Driver "modesetting"\n')
+            f.write('    Option "AccelMethod" "none"\n')
+            f.write("EndSection\n\n")
+            f.write('Section "Screen"\n')
+            f.write('    Identifier "Default Screen"\n')
+            f.write('    Device "Default VGA"\n')
+            f.write('    DefaultDepth 24\n')
+            f.write('    SubSection "Display"\n')
+            f.write("        Depth 24\n")
+            f.write('        Modes "1280x720" "1024x768" "800x600"\n')
+            f.write("    EndSubSection\n")
+            f.write("EndSection\n")
 
         # Network config (NetworkManager)
         nm_conf = os.path.join(rootfs, "etc/NetworkManager/NetworkManager.conf")
@@ -330,6 +405,7 @@ class CrossChainBuilder:
             f.write("managed=true\n")
 
         self.state.progress = 0.7
+        print("[CrossChain] System configured: auto-login + X + DE auto-start")
         return True
 
     def _stage_bootloader(self):
