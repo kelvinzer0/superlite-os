@@ -17,7 +17,6 @@ try:
     from ..launcher import AppLauncher, AppEntry, ensure_css as launcher_css
     from ..theme import get_theme, load_theme_from_config
 except ImportError:
-    # Fallback: add project root to sys.path
     _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if _project_root not in sys.path:
         sys.path.insert(0, _project_root)
@@ -54,36 +53,6 @@ def _load_keybindings() -> dict:
         }
 
 
-# Map keybinding names to Gdk keyval + modifier combos
-def _parse_keybinding(binding: str) -> tuple[int, int]:
-    """Parse a keybinding string like 'Super+Return' into (modifiers, keyval)."""
-    parts = binding.split("+")
-    mods = 0
-    key_name = parts[-1]
-    for mod in parts[:-1]:
-        mod_lower = mod.strip().lower()
-        if mod_lower in ("super", "mod4"):
-            mods |= Gdk.ModifierType.SUPER_MASK
-        elif mod_lower in ("ctrl", "control"):
-            mods |= Gdk.ModifierType.CONTROL_MASK
-        elif mod_lower == "alt":
-            mods |= Gdk.ModifierType.ALT_MASK
-        elif mod_lower == "shift":
-            mods |= Gdk.ModifierType.SHIFT_MASK
-
-    keyval = Gdk.keyval_from_name(key_name.lower())
-    if keyval == 0:
-        # Try common aliases
-        aliases = {
-            "return": Gdk.KEY_Return,
-            "space": Gdk.KEY_space,
-            "print": Gdk.KEY_Print,
-        }
-        keyval = aliases.get(key_name.lower(), 0)
-
-    return mods, keyval
-
-
 class Session:
     """
     Main session manager. Orchestrates:
@@ -118,29 +87,21 @@ class Session:
 
     def _on_activate(self, app: Gtk.Application):
         """Initialize desktop when application activates."""
-        # Load theme from config
         load_theme_from_config()
-
-        # Pre-load all CSS
         panel_css()
         launcher_css()
 
-        # Window Manager
         self.wm = WindowManager()
 
-        # Panel
         self.panel = Panel(self.wm)
         self.panel.set_application(app)
         self.panel.present()
 
-        # Launcher
         self.launcher = AppLauncher()
         self.launcher.on_launch = self._launch_app
         self.panel.set_launcher_callback(self._show_launcher)
 
-        # Bind global keyboard shortcuts
         self._setup_keybindings(app)
-
         print("[SuperLite] Session started")
 
     def _setup_keybindings(self, app: Gtk.Application):
@@ -174,9 +135,6 @@ class Session:
             action.connect("activate", lambda _, __, cb=callback: cb())
             app.add_action(action)
 
-            # Convert binding string to GTK accelerator format
-            accel = binding_str.replace("Super", "<Super>").replace("+", "")
-            # Normalize: "Super+Return" → "<Super>Return"
             parts = binding_str.split("+")
             accel_parts = []
             for p in parts[:-1]:
@@ -191,10 +149,8 @@ class Session:
                     accel_parts.append("<Shift>")
             accel_parts.append(parts[-1])
             accel = "".join(accel_parts)
-
             accels[action_name] = [accel]
 
-        # Set accelerators on the application
         for action_name, accel_list in accels.items():
             app.set_accels_for_action(f"app.{action_name}", accel_list)
 
@@ -207,25 +163,26 @@ class Session:
     def _launch_app(self, app: AppEntry):
         """Launch an application."""
         print(f"[SuperLite] Launching: {app.name} ({app.exec_cmd})")
-        try:
-            app_map = {
-                "superlite-terminal": self._spawn_terminal,
-                "superlite-files": self._spawn_filemanager,
-                "superlite-editor": self._spawn_texteditor,
-            }
+        app_map = {
+            "superlite-terminal": self._spawn_terminal,
+            "superlite-files": self._spawn_filemanager,
+            "superlite-editor": self._spawn_texteditor,
+        }
+        cmd_base = app.exec_cmd.split()[0]
+        spawn_fn = app_map.get(cmd_base)
 
-            cmd_base = app.exec_cmd.split()[0]
-            if cmd_base in app_map:
-                app_map[cmd_base]()
-            else:
+        if spawn_fn:
+            spawn_fn()
+        else:
+            try:
                 proc = subprocess.Popen(
                     app.exec_cmd.split(),
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
                 self._child_processes.append(proc)
-        except Exception as e:
-            print(f"[SuperLite] Failed to launch {app.name}: {e}")
+            except Exception as e:
+                print(f"[SuperLite] Failed to launch {app.name}: {e}")
 
     def _spawn_terminal(self):
         try:
@@ -272,15 +229,11 @@ class Session:
     def _shutdown(self):
         """Clean shutdown — kill all child processes."""
         print("[SuperLite] Shutting down...")
-
-        # Kill tracked child processes
         for proc in self._child_processes:
             try:
                 proc.terminate()
             except OSError:
                 pass
-
-        # Wait briefly, then force-kill
         import time
         time.sleep(0.5)
         for proc in self._child_processes:
@@ -289,6 +242,5 @@ class Session:
                     proc.kill()
             except OSError:
                 pass
-
         self._child_processes.clear()
         self.app.quit()

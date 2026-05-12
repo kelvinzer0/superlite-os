@@ -174,7 +174,7 @@ class AppLauncher(Gtk.Window):
 
         self.set_title("Launcher")
         self.set_decorated(False)
-        self.set_modal(True)
+        # Don't set modal — it blocks input to other windows and causes stacking issues
         self.set_default_size(600, 500)
 
         ensure_css()
@@ -219,18 +219,13 @@ class AppLauncher(Gtk.Window):
         self._on_search_changed(self.search_entry)
 
     def _load_apps(self) -> list[AppEntry]:
-        """Load apps from .desktop files, falling back to built-in defaults."""
-        apps = scan_desktop_files()
-        if not apps:
-            apps = self._default_apps()
-        # Always ensure built-in apps are present
-        builtin_names = {"superlite-terminal", "superlite-files", "superlite-editor"}
-        existing_cmds = {a.exec_cmd.split()[0] for a in apps if a.exec_cmd}
-        for builtin in self._default_apps():
-            cmd_base = builtin.exec_cmd.split()[0]
-            if cmd_base not in existing_cmds:
-                apps.append(builtin)
-        return apps
+        """Load apps — built-in first, then .desktop files."""
+        builtins = self._default_apps()
+        desktop_apps = scan_desktop_files()
+        # Filter out desktop apps that duplicate built-in commands
+        builtin_cmds = {a.exec_cmd.split()[0] for a in builtins}
+        desktop_apps = [a for a in desktop_apps if a.exec_cmd.split()[0] not in builtin_cmds]
+        return builtins + desktop_apps
 
     def _default_apps(self) -> list[AppEntry]:
         return [
@@ -336,6 +331,7 @@ class AppLauncher(Gtk.Window):
         return False  # Don't repeat
 
     def _launch(self, app: AppEntry):
+        # Close launcher, then fire callback
+        self.close()
         if self.on_launch:
             self.on_launch(app)
-        self.close()

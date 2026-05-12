@@ -1,13 +1,12 @@
-"""Window Decorations - Custom titlebar with min/max/close buttons"""
+"""Window Decorations - Simplified for running inside host WM (openbox)"""
 
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk
 
 _CSS_DONE = False
 
 def _ensure_css():
-    """Load CSS using theme variables. Call AFTER GTK display and theme are ready."""
     global _CSS_DONE
     if _CSS_DONE:
         return
@@ -15,13 +14,11 @@ def _ensure_css():
     if not d:
         return
     _CSS_DONE = True
-
     try:
         from core.theme import get_theme
         t = get_theme()
         vars_css = t.to_css_vars()
     except ImportError:
-        # Fallback if theme module not available
         vars_css = """
         @define-color sl-bg #0f0f23;
         @define-color sl-fg #e0e0f0;
@@ -32,76 +29,48 @@ def _ensure_css():
         @define-color sl-success #4ecca3;
         @define-color sl-warning #f0c040;
         @define-color sl-text-dim #808090;
-        @define-color sl-text-mid #a0a0b0;
         @define-color sl-text-bright #e0e0f0;
+        @define-color sl-caret #e94560;
         """
-
     css = vars_css.encode() + b"""
+    .sl-window {
+        background: @sl-bg;
+        color: @sl-text-bright;
+    }
     .sl-titlebar {
         background: @sl-surface;
         border-bottom: 1px solid @sl-surface-alt;
-        padding: 0 4px;
-        min-height: 32px;
-    }
-    .sl-titlebar-icon {
-        font-size: 14px;
-        margin-right: 8px;
+        padding: 0 8px;
+        min-height: 28px;
     }
     .sl-titlebar-label {
         color: @sl-text-bright;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: bold;
     }
-    .sl-titlebar-btn {
+    .sl-btn {
         background: transparent;
         border: none;
         border-radius: 4px;
-        min-width: 28px;
-        min-height: 28px;
+        min-width: 24px;
+        min-height: 24px;
         padding: 0;
-        font-size: 13px;
+        font-size: 14px;
+        color: @sl-text-dim;
     }
-    .sl-titlebar-btn:hover {
+    .sl-btn:hover {
         background: @sl-surface-alt;
+        color: @sl-text-bright;
     }
     .sl-btn-close:hover {
         background: @sl-accent;
         color: white;
     }
-    .sl-btn-minimize:hover {
-        background: @sl-warning;
-        color: @sl-surface;
-    }
-    .sl-btn-maximize:hover {
-        background: @sl-success;
-        color: @sl-surface;
-    }
-    .sl-btn-min {
-        background: @sl-warning;
-        border-radius: 50%;
-        min-width: 12px;
-        min-height: 12px;
-        margin: 2px;
-    }
-    .sl-btn-max {
-        background: @sl-success;
-        border-radius: 50%;
-        min-width: 12px;
-        min-height: 12px;
-        margin: 2px;
-    }
-    .sl-btn-cls {
+    .sl-btn-icon {
         background: @sl-accent;
         border-radius: 50%;
-        min-width: 12px;
-        min-height: 12px;
-        margin: 2px;
-    }
-    .sl-separator {
-        background: @sl-surface-alt;
-        min-width: 1px;
-        min-height: 20px;
-        margin: 0 4px;
+        min-width: 10px;
+        min-height: 10px;
     }
     """
     p = Gtk.CssProvider()
@@ -110,104 +79,26 @@ def _ensure_css():
 
 
 def apply_titlebar(window: Gtk.Window, icon: str = "⚡", title: str = None):
-    """
-    Apply a custom SuperLite titlebar to any GTK4 window.
-    
-    Args:
-        window: The GTK4 window to decorate
-        icon: Icon emoji for the titlebar
-        title: Title text (defaults to window's current title)
-    """
+    """Apply a minimal custom titlebar. Keep native decorations for min/max/close to work."""
     _ensure_css()
-    
+
     if title is None:
         title = window.get_title() or "SuperLite"
-    
-    # Prevent GTK from using default decorations
-    window.set_decorated(False)
-    
-    # Titlebar container
-    titlebar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-    titlebar.add_css_class("sl-titlebar")
-    titlebar.set_size_request(-1, 32)
-    
-    # Traffic light buttons (macOS style)
-    btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-    btn_box.set_margin_start(8)
-    btn_box.set_margin_top(6)
-    btn_box.set_margin_bottom(6)
-    
-    close_btn = Gtk.Button()
-    close_btn.add_css_class("sl-btn-cls")
-    close_btn.set_tooltip_text("Close")
-    close_btn.connect("clicked", lambda _: window.close())
-    btn_box.append(close_btn)
-    
-    min_btn = Gtk.Button()
-    min_btn.add_css_class("sl-btn-min")
-    min_btn.set_tooltip_text("Minimize")
-    min_btn.connect("clicked", lambda _: window.minimize())
-    btn_box.append(min_btn)
-    
-    max_btn = Gtk.Button()
-    max_btn.add_css_class("sl-btn-max")
-    max_btn.set_tooltip_text("Maximize")
-    max_btn.connect("clicked", lambda _: _toggle_maximize(window, max_btn))
-    btn_box.append(max_btn)
-    
-    titlebar.append(btn_box)
-    
-    # Separator
-    sep = Gtk.Box()
-    sep.add_css_class("sl-separator")
-    titlebar.append(sep)
-    
-    # Icon
+
+    # Keep native decorations — openbox handles min/max/close properly
+    # Just add a styled header bar inside the content area
+    header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    header.add_css_class("sl-titlebar")
+    header.set_size_request(-1, 28)
+
     icon_label = Gtk.Label(label=icon)
-    icon_label.add_css_class("sl-titlebar-icon")
-    titlebar.append(icon_label)
-    
-    # Title
+    header.append(icon_label)
+
     title_label = Gtk.Label(label=title)
     title_label.add_css_class("sl-titlebar-label")
     title_label.set_hexpand(True)
     title_label.set_xalign(0)
-    title_label.set_ellipsize(3)  # Pango.EllipsizeMode.END
-    titlebar.append(title_label)
-    
-    # Make titlebar draggable — GTK4 uses begin_move_drag on the surface
-    drag = Gtk.GestureDrag()
-    drag.connect("drag-begin", lambda g, x, y: _start_drag(window, g, x, y))
-    titlebar.add_controller(drag)
-    
-    # Double-click to maximize
-    click = Gtk.GestureClick()
-    click.connect("released", lambda g, n, x, y: _toggle_maximize(window, max_btn) if n >= 2 else None)
-    titlebar.add_controller(click)
-    
-    window.set_titlebar(titlebar)
-    return titlebar
+    title_label.set_ellipsize(3)
+    header.append(title_label)
 
-
-def _toggle_maximize(window: Gtk.Window, btn: Gtk.Button):
-    if window.is_maximized():
-        window.unmaximize()
-    else:
-        window.maximize()
-
-
-def _start_drag(window: Gtk.Window, gesture: Gtk.GestureDrag, x: float, y: float):
-    """Initiate window drag from titlebar using GTK4 surface API."""
-    try:
-        surface = window.get_surface()
-        if surface is not None:
-            # begin_move_drag takes: button, x_root, y_root, timestamp
-            # Use button 1 (left click), and get the event sequence timestamp
-            device = gesture.get_device()
-            event = gesture.get_last_event(None)
-            timestamp = event.get_time() if event else 0
-            surface.begin_move_drag(device, 1, x, y, timestamp)
-    except (AttributeError, TypeError):
-        # Fallback: GTK4's set_titlebar() handles drag automatically
-        # when decorations are disabled — this is just a safety net
-        pass
+    return header

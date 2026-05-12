@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=SuperLite OS Session
+Comment=SuperLite Desktop Environment
+Exec=python -m core.session
+Type=Application
+DesktopNames=SuperLite
+X-GDM-SessionRegisters=false

@@ -1,10 +1,12 @@
-"""Panel - Taskbar & System Tray"""
+"""Panel - Taskbar & System Tray (X11-aware)"""
 
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
 from datetime import datetime
 from typing import TYPE_CHECKING, Callable, Optional
+import subprocess
+import os
 
 if TYPE_CHECKING:
     from ..wm import WindowManager
@@ -24,7 +26,7 @@ def ensure_css():
     t = get_theme()
     css = t.to_css_vars().encode() + b"""
     .panel { background-color: @sl-surface; border-bottom: 1px solid @sl-surface-alt; padding: 0 8px; }
-    .app-menu-btn { background: transparent; color: @sl-accent; font-weight: bold; border: none; padding: 0 12px; }
+    .app-menu-btn { background: transparent; color: @sl-accent; font-weight: bold; border: none; padding: 0 12px; font-size: 13px; }
     .app-menu-btn:hover { background: @sl-surface-alt; }
     .ws-btn { background: @sl-surface-alt; color: @sl-text-mid; border: 1px solid @sl-border; border-radius: 3px; min-width: 24px; padding: 2px 6px; font-size: 11px; }
     .ws-active { background: @sl-accent; color: white; border-color: @sl-accent; }
@@ -49,6 +51,46 @@ def _get_screen_width() -> int:
     except Exception:
         pass
     return 1280
+
+
+def _set_x11_dock_hint(window: Gtk.Window):
+    """Use xprop to set _NET_WM_WINDOW_TYPE_DOCK after window is realized."""
+    # Find the window by title using xdotool
+    try:
+        title = window.get_title()
+        result = subprocess.run(
+            ["xdotool", "search", "--name", title],
+            capture_output=True, text=True, timeout=2
+        )
+        wids = result.stdout.strip().split()
+        if not wids:
+            return
+        wid = wids[0]
+
+        # Set _NET_WM_WINDOW_TYPE = _NET_WM_WINDOW_TYPE_DOCK
+        subprocess.run([
+            "xprop", "-id", wid,
+            "-f", "_NET_WM_WINDOW_TYPE", "32a",
+            "-set", "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_DOCK"
+        ], timeout=2, capture_output=True)
+
+        # Set _NET_WM_STRUT_PARTIAL to reserve space at top
+        # Format: left right top bottom left_start left_end right_start right_end top_start top_end bottom_start bottom_end
+        screen_w = _get_screen_width()
+        strut = f"0, 0, 36, 0, 0, 0, 0, 0, 0, {screen_w}, 0, 0"
+        subprocess.run([
+            "xprop", "-id", wid,
+            "-f", "_NET_WM_STRUT_PARTIAL", "32c",
+            "-set", "_NET_WM_STRUT_PARTIAL", strut
+        ], timeout=2, capture_output=True)
+
+        # Move to position 0,0
+        subprocess.run([
+            "xdotool", "windowmove", wid, "0", "0"
+        ], timeout=2, capture_output=True)
+
+    except Exception as e:
+        print(f"[Panel] X11 dock hint failed: {e}")
 
 
 class SystemTray(Gtk.Box):
@@ -89,15 +131,12 @@ class TaskBar(Gtk.Box):
     def __init__(self, wm: "WindowManager"):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         self.wm = wm
-        self.add_css_class("taskbar")
         self.ws_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.append(self.ws_box)
         self.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
         self.win_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         self.append(self.win_box)
-        spacer = Gtk.Box()
-        spacer.set_hexpand(True)
-        self.append(spacer)
+        spacer = Gtk.Box(); spacer.set_hexpand(True); self.append(spacer)
         self.tray = SystemTray()
         self.append(self.tray)
         GLib.timeout_add(500, self._refresh)
@@ -131,7 +170,6 @@ class Panel(Gtk.Window):
         self.set_title("SuperLite Panel")
         self.set_decorated(False)
 
-        # Set full screen width
         screen_w = _get_screen_width()
         self.set_default_size(screen_w, 36)
 
@@ -151,17 +189,16 @@ class Panel(Gtk.Window):
         self.taskbar.set_hexpand(True)
         box.append(self.taskbar)
 
-        # Position at top of screen after realize
+        # Apply X11 dock hints after window is realized
         self.connect("realize", self._on_realize)
 
     def _on_realize(self, win):
-        """Move panel to top of screen after it's realized."""
-        try:
-            surface = self.get_surface()
-            if surface:
-                surface.set_position(0, 0)
-        except Exception:
-            pass
+        """Set X11 dock properties and position at top after a short delay."""
+        GLib.timeout_add(200, self._apply_x11_hints)
+
+    def _apply_x11_hints(self) -> bool:
+        _set_x11_dock_hint(self)
+        return False  # Don't repeat
 
     def _on_app_btn_clicked(self, btn):
         if self._launcher_callback:

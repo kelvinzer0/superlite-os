@@ -82,18 +82,10 @@ class WindowManager:
         # Track window close — return False to allow the window to actually close
         window.connect("close-request", lambda w: self.unregister_window(w))
 
-        self._focus(entry)
+        # Relayout first (compute positions), then apply geometry, then focus
         self._relayout()
-
-        # Apply computed geometry to the GTK window
-        entry.window.set_default_size(entry.width, entry.height)
-        try:
-            # GTK4: move via surface if available
-            surface = entry.window.get_surface()
-            if surface is not None:
-                surface.set_position(entry.x, entry.y)
-        except (AttributeError, TypeError):
-            pass
+        self._apply_geometry(entry)
+        self._focus(entry)
 
         return entry
 
@@ -120,12 +112,50 @@ class WindowManager:
         return None
 
     def _focus(self, entry: WindowEntry):
-        """Focus a window."""
-        if self.focused:
+        """Focus a window and raise it to top of stack."""
+        if self.focused and self.focused is not entry:
             self.focused.focused = False
         entry.focused = True
         self.focused = entry
-        entry.window.present()
+        # Raise focused window to top — use idle_add to ensure it happens
+        # after any pending GTK events (like launcher closing)
+        GLib.idle_add(self._do_raise, entry)
+
+    def _do_raise(self, entry: WindowEntry) -> bool:
+        """Actually raise the window (called via idle_add)."""
+        if entry in self.windows and entry.window.get_visible():
+            entry.window.present()
+            # Also restack: ensure focused window is above all others
+            self._enforce_stacking()
+        return False  # Don't repeat
+
+    def _enforce_stacking(self):
+        """Ensure proper z-ordering: focused on top, tiled windows don't overlap."""
+        if not self.focused:
+            return
+        ws = self.workspaces[self.current_workspace]
+        visible = [w for w in ws.windows if not w.minimized and w is not self.focused]
+        # Raise focused last so it's on top
+        for entry in visible:
+            try:
+                entry.window.present()
+            except Exception:
+                pass
+        # Focused window is last → on top
+        try:
+            self.focused.window.present()
+        except Exception:
+            pass
+
+    def _apply_geometry(self, entry: WindowEntry):
+        """Apply computed position and size to a GTK window."""
+        entry.window.set_default_size(entry.width, entry.height)
+        try:
+            surface = entry.window.get_surface()
+            if surface is not None:
+                surface.set_position(entry.x, entry.y)
+        except (AttributeError, TypeError):
+            pass
 
     def _switch_workspace(self, workspace_id: int):
         """Switch to a different workspace, hiding/showing windows."""
@@ -228,15 +258,9 @@ class WindowManager:
 
         if ws.layout == LayoutMode.TILING:
             self._tile(visible)
-            # Apply positions to all visible windows
+            # Apply geometry to all visible windows
             for entry in visible:
-                entry.window.set_default_size(entry.width, entry.height)
-                try:
-                    surface = entry.window.get_surface()
-                    if surface is not None:
-                        surface.set_position(entry.x, entry.y)
-                except (AttributeError, TypeError):
-                    pass
+                self._apply_geometry(entry)
 
     def _tile(self, windows: list[WindowEntry]):
         """Tile windows in master-stack layout."""
