@@ -10,8 +10,8 @@ import subprocess
 from typing import Optional
 
 from ..wm import WindowManager
-from ..panel import Panel
-from ..launcher import AppLauncher, AppEntry
+from ..panel import Panel, ensure_css as panel_css
+from ..launcher import AppLauncher, AppEntry, ensure_css as launcher_css
 
 
 class Session:
@@ -35,11 +35,9 @@ class Session:
 
     def run(self, argv: list[str] = None):
         """Start the desktop session."""
-        # Handle SIGTERM gracefully
         signal.signal(signal.SIGTERM, lambda *_: self._shutdown())
         signal.signal(signal.SIGINT, lambda *_: self._shutdown())
 
-        # Set environment
         os.environ.setdefault("XDG_CURRENT_DESKTOP", "SuperLite")
         os.environ.setdefault("DESKTOP_SESSION", "superlite")
 
@@ -47,6 +45,11 @@ class Session:
 
     def _on_activate(self, app: Gtk.Application):
         """Initialize desktop when application activates."""
+        # Pre-load all CSS
+        panel_css()
+        launcher_css()
+
+        # Window Manager
         self.wm = WindowManager()
 
         # Panel
@@ -59,16 +62,7 @@ class Session:
         self.launcher.on_launch = self._launch_app
         self.panel.set_launcher_callback(self._show_launcher)
 
-        # Keyboard shortcuts (global)
-        self._setup_global_keys(app)
-
         print("[SuperLite] Session started")
-
-    def _setup_global_keys(self, app: Gtk.Application):
-        """Register global keyboard shortcuts."""
-        # These would be handled at compositor level in production
-        # For development, we use Gtk.EventControllerKey on the panel
-        pass
 
     def _show_launcher(self):
         """Show the app launcher overlay."""
@@ -77,10 +71,9 @@ class Session:
             self.launcher.present()
 
     def _launch_app(self, app: AppEntry):
-        """Launch an application by exec command."""
+        """Launch an application."""
         print(f"[SuperLite] Launching: {app.name} ({app.exec_cmd})")
         try:
-            # Map known apps to internal modules
             app_map = {
                 "superlite-terminal": self._spawn_terminal,
                 "superlite-files": self._spawn_filemanager,

@@ -16,6 +16,66 @@ class AppEntry:
     category: str = "Other"
 
 
+# Launcher CSS — loaded once via ensure_css()
+_LAUNCHER_CSS_LOADED = False
+
+def ensure_css():
+    """Load CSS once. Call AFTER GTK display is ready."""
+    global _LAUNCHER_CSS_LOADED
+    if _LAUNCHER_CSS_LOADED:
+        return
+    display = Gdk.Display.get_default()
+    if display is None:
+        return
+    _LAUNCHER_CSS_LOADED = True
+
+    css = b"""
+    .launcher-overlay {
+        background: rgba(0, 0, 0, 0.6);
+    }
+    .launcher {
+        background: #1a1a2e;
+        border: 2px solid #e94560;
+        border-radius: 12px;
+        padding: 16px;
+    }
+    .launcher-search {
+        background: #16213e;
+        color: #e0e0f0;
+        border: 1px solid #0f3460;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 16px;
+        caret-color: #e94560;
+    }
+    .launcher-item {
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 12px;
+        color: #e0e0f0;
+    }
+    .launcher-item:hover, .launcher-item-selected {
+        background: #16213e;
+    }
+    .launcher-item-name {
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .launcher-item-desc {
+        font-size: 11px;
+        color: #808090;
+    }
+    """
+    provider = Gtk.CssProvider()
+    provider.load_from_data(css)
+    Gtk.StyleContext.add_provider_for_display(
+        display,
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
+
+
 class AppLauncher(Gtk.Window):
     """Overlay-style application launcher with search."""
 
@@ -27,15 +87,18 @@ class AppLauncher(Gtk.Window):
         self.set_title("Launcher")
         self.set_decorated(False)
         self.set_modal(True)
+        self.set_default_size(600, 500)
+
+        ensure_css()
 
         # Main container
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        self.box.add_css_class("launcher")
-        self.box.set_margin_top(200)
-        self.box.set_margin_bottom(200)
-        self.box.set_margin_start(300)
-        self.box.set_margin_end(300)
-        self.set_child(self.box)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.add_css_class("launcher")
+        box.set_margin_top(20)
+        box.set_margin_bottom(20)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+        self.set_child(box)
 
         # Search bar
         self.search_entry = Gtk.SearchEntry()
@@ -43,19 +106,18 @@ class AppLauncher(Gtk.Window):
         self.search_entry.add_css_class("launcher-search")
         self.search_entry.connect("search-changed", self._on_search_changed)
         self.search_entry.connect("activate", self._on_activate)
-        self.box.append(self.search_entry)
+        box.append(self.search_entry)
 
         # Scrolled results
         self.scrolled = Gtk.ScrolledWindow()
-        self.scrolled.set_min_content_height(400)
+        self.scrolled.set_min_content_height(300)
         self.scrolled.set_vexpand(True)
-        self.box.append(self.scrolled)
+        box.append(self.scrolled)
 
         # Results list
         self.results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.scrolled.set_child(self.results_box)
 
-        # Selected index for keyboard navigation
         self._selected_idx = 0
         self._filtered: list[AppEntry] = []
         self._buttons: list[Gtk.Button] = []
@@ -65,20 +127,15 @@ class AppLauncher(Gtk.Window):
         key_ctrl.connect("key-pressed", self._on_key)
         self.add_controller(key_ctrl)
 
-        # Apply style
-        self._apply_style()
-
         # Initial display
         self._on_search_changed(self.search_entry)
 
     def _default_apps(self) -> list[AppEntry]:
         return [
-            AppEntry("Terminal", "superlite-terminal", "utilities-terminal", "System terminal emulator", "System"),
+            AppEntry("Terminal", "superlite-terminal", "utilities-terminal", "System terminal", "System"),
             AppEntry("Files", "superlite-files", "system-file-manager", "File manager", "System"),
             AppEntry("Text Editor", "superlite-editor", "accessories-text-editor", "Text editor", "Accessories"),
-            AppEntry("Chrome", "google-chrome --no-sandbox", "google-chrome", "Google Chrome browser", "Internet"),
-            AppEntry("Settings", "superlite-settings", "preferences-system", "System settings", "System"),
-            AppEntry("Task Manager", "superlite-taskmgr", "utilities-system-monitor", "Process viewer", "System"),
+            AppEntry("Chrome", "google-chrome --no-sandbox", "google-chrome", "Chrome browser", "Internet"),
         ]
 
     def _on_search_changed(self, entry: Gtk.SearchEntry):
@@ -88,7 +145,6 @@ class AppLauncher(Gtk.Window):
             if query in app.name.lower() or query in app.description.lower()
         ] if query else list(self.apps)
 
-        # Rebuild results
         while self.results_box.get_first_child():
             self.results_box.remove(self.results_box.get_first_child())
 
@@ -99,12 +155,10 @@ class AppLauncher(Gtk.Window):
 
             row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
 
-            # Icon
             icon = Gtk.Image.new_from_icon_name(app.icon)
             icon.set_pixel_size(32)
             row.append(icon)
 
-            # Text
             text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             name_label = Gtk.Label(label=app.name)
             name_label.set_xalign(0)
@@ -160,46 +214,3 @@ class AppLauncher(Gtk.Window):
         if self.on_launch:
             self.on_launch(app)
         self.close()
-
-    def _apply_style(self):
-        css = b"""
-        .launcher {
-            background: rgba(26, 26, 46, 0.95);
-            border: 2px solid #e94560;
-            border-radius: 12px;
-        }
-        .launcher-search {
-            background: #16213e;
-            color: #e0e0f0;
-            border: 1px solid #0f3460;
-            border-radius: 8px;
-            padding: 12px 16px;
-            font-size: 16px;
-            caret-color: #e94560;
-        }
-        .launcher-item {
-            background: transparent;
-            border: none;
-            border-radius: 6px;
-            padding: 8px 12px;
-            color: #e0e0f0;
-        }
-        .launcher-item:hover, .launcher-item-selected {
-            background: #16213e;
-        }
-        .launcher-item-name {
-            font-weight: bold;
-            font-size: 14px;
-        }
-        .launcher-item-desc {
-            font-size: 11px;
-            color: #808090;
-        }
-        """
-        provider = Gtk.CssProvider()
-        provider.load_from_data(css)
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )

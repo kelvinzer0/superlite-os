@@ -4,10 +4,86 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from ..wm import WindowManager
+
+
+# Global CSS — loaded once via ensure_css()
+_CSS_LOADED = False
+
+def ensure_css():
+    """Load CSS once. Call AFTER GTK display is ready."""
+    global _CSS_LOADED
+    if _CSS_LOADED:
+        return
+    display = Gdk.Display.get_default()
+    if display is None:
+        return
+    _CSS_LOADED = True
+
+    css = b"""
+    .panel {
+        background-color: #1a1a2e;
+        border-bottom: 1px solid #16213e;
+        padding: 0 8px;
+    }
+    .app-menu-btn {
+        background: transparent;
+        color: #e94560;
+        font-weight: bold;
+        border: none;
+        padding: 0 12px;
+    }
+    .app-menu-btn:hover {
+        background: #16213e;
+    }
+    .ws-btn {
+        background: #16213e;
+        color: #a0a0b0;
+        border: 1px solid #0f3460;
+        border-radius: 3px;
+        min-width: 24px;
+        padding: 2px 6px;
+        font-size: 11px;
+    }
+    .ws-active {
+        background: #e94560;
+        color: white;
+        border-color: #e94560;
+    }
+    .ws-has-windows {
+        color: #e0e0f0;
+    }
+    .win-btn {
+        background: #16213e;
+        color: #a0a0b0;
+        border: 1px solid #0f3460;
+        border-radius: 3px;
+        padding: 2px 10px;
+        font-size: 11px;
+    }
+    .win-focused {
+        background: #0f3460;
+        color: white;
+        border-color: #e94560;
+    }
+    .system-tray {
+        color: #c0c0d0;
+        font-size: 12px;
+    }
+    .clock {
+        font-family: monospace;
+    }
+    """
+    provider = Gtk.CssProvider()
+    provider.load_from_data(css)
+    Gtk.StyleContext.add_provider_for_display(
+        display,
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
 
 
 class SystemTray(Gtk.Box):
@@ -17,29 +93,23 @@ class SystemTray(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.add_css_class("system-tray")
 
-        # Clock
         self.clock_label = Gtk.Label(label="")
         self.clock_label.add_css_class("clock")
         self.append(self.clock_label)
 
-        # Separator
         self.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
 
-        # Battery (if available)
         self.battery_label = Gtk.Label(label="")
         self.battery_label.add_css_class("battery")
         self.append(self.battery_label)
 
-        # Volume
         self.volume_label = Gtk.Label(label="🔊")
         self.volume_label.add_css_class("volume")
         self.append(self.volume_label)
 
-        # Update clock every second
         GLib.timeout_add_seconds(1, self._update_clock)
         self._update_clock()
 
-        # Update battery every 30s
         GLib.timeout_add_seconds(30, self._update_battery)
         self._update_battery()
 
@@ -69,39 +139,25 @@ class TaskBar(Gtk.Box):
         self.wm = wm
         self.add_css_class("taskbar")
 
-        # Workspace indicators
         self.ws_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
-        self.ws_box.add_css_class("workspace-indicators")
         self.append(self.ws_box)
 
-        # Separator
         self.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
 
-        # Window buttons
         self.win_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
-        self.win_box.add_css_class("window-buttons")
         self.append(self.win_box)
 
-        # Spacer (pushes tray to right)
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         self.append(spacer)
 
-        # System tray
         self.tray = SystemTray()
         self.append(self.tray)
 
-        # Refresh every 500ms
         GLib.timeout_add(500, self._refresh)
-        self._refresh()
 
     def _refresh(self) -> bool:
-        self._update_workspaces()
-        self._update_windows()
-        return True
-
-    def _update_workspaces(self):
-        """Update workspace indicators."""
+        # Clear workspace buttons
         while self.ws_box.get_first_child():
             self.ws_box.remove(self.ws_box.get_first_child())
 
@@ -115,8 +171,7 @@ class TaskBar(Gtk.Box):
             btn.connect("clicked", lambda b, wid=ws["id"]: self.wm._switch_workspace(wid))
             self.ws_box.append(btn)
 
-    def _update_windows(self):
-        """Update window buttons in taskbar."""
+        # Clear window buttons
         while self.win_box.get_first_child():
             self.win_box.remove(self.win_box.get_first_child())
 
@@ -125,9 +180,9 @@ class TaskBar(Gtk.Box):
             btn.add_css_class("win-btn")
             if win["focused"]:
                 btn.add_css_class("win-focused")
-            if win["minimized"]:
-                btn.add_css_class("win-minimized")
             self.win_box.append(btn)
+
+        return True
 
 
 class Panel(Gtk.Window):
@@ -136,91 +191,27 @@ class Panel(Gtk.Window):
     def __init__(self, wm: "WindowManager"):
         super().__init__()
         self.wm = wm
+        self._launcher_callback: Callable = None
+
         self.set_title("SuperLite Panel")
         self.set_decorated(False)
 
-        # Main container
-        self.box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        self.box.set_size_request(-1, 36)
-        self.box.add_css_class("panel")
-        self.set_child(self.box)
+        ensure_css()
 
-        # App menu button (launcher trigger)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        box.set_size_request(-1, 36)
+        box.add_css_class("panel")
+        self.set_child(box)
+
         self.app_btn = Gtk.Button(label="⚡ SuperLite")
         self.app_btn.add_css_class("app-menu-btn")
-        self.box.append(self.app_btn)
+        box.append(self.app_btn)
 
-        # Taskbar
         self.taskbar = TaskBar(wm)
         self.taskbar.set_hexpand(True)
-        self.box.append(self.taskbar)
+        box.append(self.taskbar)
 
-        # Apply CSS
-        self._apply_style()
-
-    def _apply_style(self):
-        css = b"""
-        .panel {
-            background-color: #1a1a2e;
-            border-bottom: 1px solid #16213e;
-            padding: 0 8px;
-        }
-        .app-menu-btn {
-            background: transparent;
-            color: #e94560;
-            font-weight: bold;
-            border: none;
-            padding: 0 12px;
-        }
-        .app-menu-btn:hover {
-            background: #16213e;
-        }
-        .ws-btn {
-            background: #16213e;
-            color: #a0a0b0;
-            border: 1px solid #0f3460;
-            border-radius: 3px;
-            min-width: 24px;
-            padding: 2px 6px;
-            font-size: 11px;
-        }
-        .ws-active {
-            background: #e94560;
-            color: white;
-            border-color: #e94560;
-        }
-        .ws-has-windows {
-            color: #e0e0f0;
-        }
-        .win-btn {
-            background: #16213e;
-            color: #a0a0b0;
-            border: 1px solid #0f3460;
-            border-radius: 3px;
-            padding: 2px 10px;
-            font-size: 11px;
-        }
-        .win-focused {
-            background: #0f3460;
-            color: white;
-            border-color: #e94560;
-        }
-        .system-tray {
-            color: #c0c0d0;
-            font-size: 12px;
-        }
-        .clock {
-            font-family: monospace;
-        }
-        """
-        provider = Gtk.CssProvider()
-        provider.load_from_data(css)
-        Gtk.StyleContext.add_provider_for_display(
-            Gdk.Display.get_default(),
-            provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-        )
-
-    def set_launcher_callback(self, callback):
+    def set_launcher_callback(self, callback: Callable):
         """Connect app menu button to launcher."""
+        self._launcher_callback = callback
         self.app_btn.connect("clicked", lambda b: callback())
