@@ -57,7 +57,7 @@ class DriverDump:
     """
 
     DRIVER_TYPES = {
-        "gpu": ["nvidia", "nouveau", "amdgpu", "radeon", "i915", "xe"],
+        "gpu": ["nvidia", "nouveau", "amdgpu", "radeon", "i915", "xe", "virtio_gpu", "cirrus"],
         "network": ["iwlwifi", "ath9k", "rtw89", "r8169", "e1000e", "tg3", "bnxt_en", "mlx5"],
         "storage": ["ahci", "nvme", "sd_mod", "usb_storage", "mmc_block"],
         "usb": ["xhci_hcd", "ehci_hcd", "ohci_hcd", "usbhid", "hid_generic"],
@@ -65,7 +65,7 @@ class DriverDump:
         "audio": ["snd_hda_intel", "snd_usb_audio", "snd_soc", "snd_sof"],
         "bluetooth": ["btusb", "bluetooth", "btintel", "btrtl"],
         "wifi": ["cfg80211", "mac80211", "iwlmvm"],
-        "virtual": ["vboxguest", "vmw_balloon", "vmwgfx", "hyperv_drm", "virtio"],
+        "virtual": ["vboxguest", "vmw_balloon", "vmwgfx", "hyperv_drm", "virtio", "virtio_pci", "virtio_ring"],
     }
 
     def __init__(self, output_dir: str = None):
@@ -297,7 +297,9 @@ class DriverDump:
             "xhci_hcd", "ehci_hcd", "usbhid",  # USB
             "ahci", "nvme", "sd_mod",  # Storage
             "evdev", "libps2",  # Input
-            "i915", "amdgpu", "nouveau",  # GPU (try all)
+            "i915", "amdgpu", "nouveau",  # GPU (host)
+            "virtio_gpu", "virtio_pci", "virtio", "virtio_ring",  # GPU (QEMU/VM)
+            "cirrus", "cirrusfb",  # GPU (legacy/QEMU)
             "cfg80211", "mac80211",  # WiFi stack
         ]
         required_modules.update(essentials)
