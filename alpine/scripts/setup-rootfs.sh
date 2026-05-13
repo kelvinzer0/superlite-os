@@ -25,6 +25,90 @@ apk upgrade --available
 echo "[setup] Installing packages (this will take a while)..."
 xargs apk add --no-cache < /tmp/packages.list 2>&1 | tail -5
 
+# ── Firmware compression ─────────────────────────────────────────────────────
+echo "[setup] Compressing firmware..."
+if [ -f /tmp/hooks/compress-firmware.sh ]; then
+    chmod +x /tmp/hooks/compress-firmware.sh
+    /tmp/hooks/compress-firmware.sh /lib/firmware || true
+fi
+
+# ── Fix /sbin/init ────────────────────────────────────────────────────────────
+echo "[setup] Fixing /sbin/init..."
+
+# Ensure /sbin/init exists and is executable
+# Alpine uses busybox init or openrc-init — make sure at least one works
+if [ ! -e /sbin/init ]; then
+    # Try to link to busybox init
+    if [ -x /bin/busybox ]; then
+        ln -sf /bin/busybox /sbin/init
+        echo "[setup] Linked /sbin/init -> /bin/busybox"
+    elif [ -x /sbin/openrc-init ]; then
+        ln -sf /sbin/openrc-init /sbin/init
+        echo "[setup] Linked /sbin/init -> /sbin/openrc-init"
+    elif [ -x /sbin/openrc ]; then
+        # Create a wrapper that calls openrc
+        cat > /sbin/init << 'INITEOF'
+#!/bin/sh
+exec /sbin/openrc "$@"
+INITEOF
+        chmod +x /sbin/init
+        echo "[setup] Created /sbin/init wrapper for openrc"
+    else
+        echo "[setup] WARNING: No init system found! Installing busybox-static..."
+        apk add busybox-static 2>/dev/null || true
+        if [ -x /bin/busybox ]; then
+            ln -sf /bin/busybox /sbin/init
+        fi
+    fi
+fi
+
+# Verify /sbin/init is actually executable
+if [ -e /sbin/init ] && [ ! -x /sbin/init ]; then
+    chmod +x /sbin/init
+    echo "[setup] Fixed /sbin/init permissions"
+fi
+
+# Double-check
+if [ ! -x /sbin/init ]; then
+    echo "[setup] CRITICAL: /sbin/init is not executable!"
+    ls -la /sbin/init 2>/dev/null || echo "[setup] /sbin/init does not exist"
+    # Last resort: install the init wrapper
+    if [ -f /tmp/hooks/superlite-init-wrapper ]; then
+        cp /tmp/hooks/superlite-init-wrapper /sbin/init
+        chmod +x /sbin/init
+        echo "[setup] Installed emergency init wrapper"
+    fi
+fi
+
+echo "[setup] /sbin/init status: $(ls -la /sbin/init 2>/dev/null || echo 'MISSING')"
+
+# ── mkinitfs configuration ───────────────────────────────────────────────────
+echo "[setup] Configuring mkinitfs..."
+if [ -f /tmp/hooks/mkinitfs-superlite.conf ]; then
+    cp /tmp/hooks/mkinitfs-superlite.conf /etc/mkinitfs/superlite.conf
+fi
+
+# Install the live-boot hook into mkinitfs features
+mkdir -p /etc/mkinitfs/features.d
+if [ -f /tmp/hooks/live-boot ]; then
+    cp /tmp/hooks/live-boot /etc/mkinitfs/features.d/superlite-live.init
+    chmod +x /etc/mkinitfs/features.d/superlite-live.init
+fi
+
+# Install the live init script for use by initramfs
+if [ -f /tmp/hooks/superlite-live.init ]; then
+    cp /tmp/hooks/superlite-live.init /etc/mkinitfs/superlite-live.init
+    chmod +x /etc/mkinitfs/superlite-live.init
+fi
+
+# Regenerate initramfs with live-boot support
+echo "[setup] Regenerating initramfs..."
+KVER=$(ls /lib/modules/ 2>/dev/null | head -1 || echo "lts")
+if [ -n "$KVER" ] && [ -d "/lib/modules/$KVER" ]; then
+    mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -3 || \
+        echo "[setup] WARNING: mkinitfs failed, will try later"
+fi
+
 # ── Enable services ──────────────────────────────────────────────────────────
 echo "[setup] Enabling services..."
 rc-update add bootmisc boot 2>/dev/null || true
@@ -38,7 +122,6 @@ rc-update add devfs sysinit 2>/dev/null || true
 rc-update add dmesg sysinit 2>/dev/null || true
 rc-update add mdev sysinit 2>/dev/null || true
 rc-update add hwdrivers sysinit 2>/dev/null || true
-rc-update add modloop sysinit 2>/dev/null || true
 
 rc-update add seatd default 2>/dev/null || true
 rc-update add dbus default 2>/dev/null || true
@@ -54,10 +137,8 @@ echo "::1       localhost ip6-localhost ip6-loopback" >> /etc/hosts
 
 # ── Auto-login on tty1 ──────────────────────────────────────────────────────
 echo "[setup] Configuring auto-login..."
-mkdir -p /etc/init.d
+mkdir -p /etc/init.d /etc/conf.d
 
-# Create agetty autologin override for tty1
-mkdir -p /etc/conf.d
 cat > /etc/conf.d/agetty.tty1 << 'EOF'
 BAUDRATE="115200"
 TERM="foot"
@@ -91,17 +172,12 @@ PROFILE
 # ── Copy dotfiles to /etc/skel ──────────────────────────────────────────────
 echo "[setup] Installing dotfiles..."
 if [ -d /tmp/dotfiles ]; then
-    # Copy all dotfiles to skel
     cp -rT /tmp/dotfiles /etc/skel/ 2>/dev/null || cp -r /tmp/dotfiles/. /etc/skel/
-    
-    # Also copy to root home
     cp -rT /tmp/dotfiles /root/ 2>/dev/null || cp -r /tmp/dotfiles/. /root/
-    
-    # Set permissions
     find /etc/skel -name '*.sh' -exec chmod +x {} \; 2>/dev/null
     find /root -name '*.sh' -exec chmod +x {} \; 2>/dev/null
-    chmod +x /etc/skel/.config/scripts/* 2>/dev/null
-    chmod +x /root/.config/scripts/* 2>/dev/null
+    chmod +x /etc/skel/.config/scripts/* 2>/dev/null || true
+    chmod +x /root/.config/scripts/* 2>/dev/null || true
 fi
 
 # ── LabWC session for root auto-login ──────────────────────────────────────
@@ -158,8 +234,9 @@ EOF
 
 # ── Clean up ───────────────────────────────────────────────────────────────
 echo "[setup] Cleaning up..."
-rm -rf /tmp/packages.list /tmp/repositories /tmp/dotfiles /tmp/setup-rootfs.sh
+rm -rf /tmp/packages.list /tmp/repositories /tmp/dotfiles /tmp/setup-rootfs.sh /tmp/hooks
 apk cache clean 2>/dev/null
 rm -rf /var/cache/apk/*
 
 echo "[setup] Rootfs configuration complete!"
+echo "[setup] Final /sbin/init: $(ls -la /sbin/init 2>/dev/null || echo 'MISSING')"

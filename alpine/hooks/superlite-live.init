@@ -1,40 +1,156 @@
 #!/bin/sh
-# SuperLite OS — Live boot init overlay
-# Called during initramfs boot when boot=live is detected
+# ============================================================================
+# SuperLite OS — Live Boot Init Script
+# Replaces /sbin/init in initramfs when boot=live is detected
+# ============================================================================
+# This script is installed into the initramfs and handles:
+#   1. Mounting virtual filesystems (devtmpfs, proc, sys)
+#   2. Detecting the boot media (USB, CD-ROM, MMC)
+#   3. Mounting squashfs rootfs
+#   4. Creating tmpfs overlay for writable live session
+#   5. switch_root into the live system
+# ============================================================================
 
-# Mount the ISO
-ISO_DEV=""
-for dev in /dev/sr0 /dev/sda /dev/sdb /dev/sdc /dev/mmcblk0; do
-    if [ -b "$dev" ]; then
-        mkdir -p /media/iso
-        mount -t iso9660 "$dev" /media/iso 2>/dev/null && ISO_DEV="$dev" && break
-    fi
+set -e
+
+LIVE_LOG() { echo "[live] $*"; }
+LIVE_ERR() { echo "[live] ERROR: $*" >&2; }
+
+# ── Step 1: Mount essential virtual filesystems ──────────────────────────────
+LIVE_LOG "Mounting virtual filesystems..."
+mount -t proc     proc     /proc  2>/dev/null || true
+mount -t sysfs    sysfs    /sys   2>/dev/null || true
+mount -t devtmpfs devtmpfs /dev   2>/dev/null || true
+mkdir -p /dev/pts /dev/shm
+mount -t devpts   devpts   /dev/pts  2>/dev/null || true
+mount -t tmpfs    tmpfs    /dev/shm  2>/dev/null || true
+
+# Load essential modules
+for mod in isofs squashfs loop overlay usb-storage sd_mod sr_mod mmc_block vfat nls_cp437 nls_iso8859_1; do
+    modprobe "$mod" 2>/dev/null || true
 done
 
+# Wait briefly for device nodes to appear
+sleep 1
+
+# ── Step 2: Find the boot media ──────────────────────────────────────────────
+LIVE_LOG "Searching for boot media..."
+
+ISO_DEV=""
+ISO_MOUNT="/mnt/iso"
+
+find_boot_media() {
+    # Check kernel command line for explicit device
+    for param in $(cat /proc/cmdline 2>/dev/null); do
+        case "$param" in
+            live=*) ISO_DEV="${param#live=}"; return ;;
+        esac
+    done
+
+    # Auto-detect: try common block devices
+    for dev in \
+        /dev/sr0 /dev/cdrom \
+        /dev/sda /dev/sdb /dev/sdc /dev/sdd \
+        /dev/mmcblk0 /dev/mmcblk1 \
+        /dev/vda /dev/vdb \
+        /dev/nvme0n1; do
+        if [ -b "$dev" ]; then
+            mkdir -p "$ISO_MOUNT"
+            if mount -t iso9660 -o ro "$dev" "$ISO_MOUNT" 2>/dev/null; then
+                ISO_DEV="$dev"
+                LIVE_LOG "Found ISO on $dev (iso9660)"
+                return
+            fi
+            if mount -t vfat -o ro "$dev" "$ISO_MOUNT" 2>/dev/null; then
+                if [ -f "$ISO_MOUNT/live/rootfs.squashfs" ]; then
+                    ISO_DEV="$dev"
+                    LIVE_LOG "Found live media on $dev (vfat)"
+                    return
+                fi
+                umount "$ISO_MOUNT" 2>/dev/null
+            fi
+            # Try without filesystem type
+            if mount -o ro "$dev" "$ISO_MOUNT" 2>/dev/null; then
+                if [ -f "$ISO_MOUNT/live/rootfs.squashfs" ] || [ -d "$ISO_MOUNT/live" ]; then
+                    ISO_DEV="$dev"
+                    LIVE_LOG "Found live media on $dev"
+                    return
+                fi
+                umount "$ISO_MOUNT" 2>/dev/null
+            fi
+        fi
+    done
+}
+
+find_boot_media
+
 if [ -z "$ISO_DEV" ]; then
-    echo "[live] No ISO device found, continuing normal boot..."
-    return 0
+    LIVE_ERR "No boot media found! Dropping to emergency shell."
+    exec /bin/sh
 fi
 
-# Find squashfs
-SQUASHFS="/media/iso/live/rootfs.squashfs"
-if [ ! -f "$SQUASHFS" ]; then
-    echo "[live] No rootfs.squashfs found, continuing normal boot..."
-    umount /media/iso 2>/dev/null
-    return 0
+# ── Step 3: Mount squashfs rootfs ────────────────────────────────────────────
+SQUASHFS_PATH="$ISO_MOUNT/live/rootfs.squashfs"
+
+if [ ! -f "$SQUASHFS_PATH" ]; then
+    LIVE_ERR "rootfs.squashfs not found at $SQUASHFS_PATH"
+    LIVE_ERR "Contents of $ISO_MOUNT/live/:"
+    ls -la "$ISO_MOUNT/live/" 2>/dev/null || LIVE_ERR "(directory not found)"
+    exec /bin/sh
 fi
 
-# Mount squashfs
+LIVE_LOG "Mounting squashfs rootfs..."
 mkdir -p /live/rootfs
-mount -t squashfs "$SQUASHFS" /live/rootfs || { echo "[live] Failed to mount squashfs"; return 1; }
+mount -t squashfs -o ro "$SQUASHFS_PATH" /live/rootfs || {
+    LIVE_ERR "Failed to mount squashfs"
+    exec /bin/sh
+}
 
-# Create overlay
-mkdir -p /live/overlay /live/work
-mount -t tmpfs tmpfs /live/overlay
+# Verify squashfs has /sbin/init
+if [ ! -x "/live/rootfs/sbin/init" ] && [ ! -L "/live/rootfs/sbin/init" ]; then
+    LIVE_ERR "No /sbin/init found in squashfs rootfs!"
+    LIVE_ERR "Listing /live/rootfs/sbin/:"
+    ls -la /live/rootfs/sbin/ 2>/dev/null || LIVE_ERR "(not found)"
+    exec /bin/sh
+fi
+
+# ── Step 4: Create overlay for writable live session ─────────────────────────
+LIVE_LOG "Creating overlay filesystem..."
+mkdir -p /live/overlay /live/work /live/merged
+
+mount -t tmpfs -o size=75% tmpfs /live/overlay || {
+    LIVE_ERR "Failed to mount overlay tmpfs"
+    exec /bin/sh
+}
+
 mount -t overlay overlay \
     -o lowerdir=/live/rootfs,upperdir=/live/overlay,workdir=/live/work \
-    /live/merged
+    /live/merged || {
+    LIVE_ERR "Failed to mount overlay"
+    exec /bin/sh
+}
 
-# Switch root
-echo "[live] Switching to live root..."
-exec switch_root /live/merged /sbin/init
+# ── Step 5: Copy ISO media to merged root (for persistence) ─────────────────
+mkdir -p /live/merged/media/iso
+if mountpoint -q "$ISO_MOUNT"; then
+    mount --bind "$ISO_MOUNT" /live/merged/media/iso 2>/dev/null || true
+fi
+
+# ── Step 6: Clean up and switch root ─────────────────────────────────────────
+LIVE_LOG "Switching to live root..."
+
+# Unmount proc/sys/dev before switch_root (switch_root handles this, but be safe)
+umount /proc 2>/dev/null || true
+umount /sys  2>/dev/null || true
+
+# Verify /sbin/init exists in merged root
+INIT_PATH="/live/merged/sbin/init"
+if [ ! -e "$INIT_PATH" ]; then
+    LIVE_ERR "/sbin/init not found in merged root!"
+    LIVE_ERR "Contents of /live/merged/sbin/:"
+    ls -la /live/merged/sbin/ 2>/dev/null || LIVE_ERR "(sbin not found)"
+    exec /bin/sh
+fi
+
+# switch_root: pivot to the live system
+exec switch_root /live/merged /sbin/init "$@"

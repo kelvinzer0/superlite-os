@@ -1,0 +1,33 @@
+#!/bin/sh
+# ============================================================================
+# SuperLite OS — /sbin/init wrapper
+# This is the actual /sbin/init installed in the rootfs (not initramfs).
+# It checks if we're in a live-boot context or normal boot and routes
+# to the appropriate init system.
+# ============================================================================
+# In Alpine Linux with OpenRC, /sbin/init is normally provided by busybox
+# or openrc. This wrapper ensures proper boot regardless of boot method.
+# ============================================================================
+
+# If we have openrc-init, use it (preferred for Alpine)
+if [ -x /sbin/openrc-init ]; then
+    exec /sbin/openrc-init "$@"
+fi
+
+# If we have busybox init, use it
+if [ -x /bin/busybox ] && /bin/busybox --list 2>/dev/null | grep -q init; then
+    exec /bin/busybox init "$@"
+fi
+
+# Fallback: try openrc directly
+if [ -x /sbin/openrc ]; then
+    exec /sbin/openrc "$@"
+fi
+
+# Last resort: emergency shell
+echo "[init] ERROR: No init system found!"
+echo "[init] Available in /sbin/:"
+ls -la /sbin/ 2>/dev/null
+echo ""
+echo "[init] Dropping to emergency shell..."
+exec /bin/sh

@@ -170,9 +170,18 @@ configure_rootfs() {
         cp -r "$DOTFILES_DIR" "${ROOTFS_DIR}/tmp/dotfiles"
     fi
 
-    # Copy hooks if they exist
+    # Copy hooks if they exist (includes firmware compression script)
     if [[ -d "${SCRIPT_DIR}/alpine/hooks" ]]; then
         cp -r "${SCRIPT_DIR}/alpine/hooks" "${ROOTFS_DIR}/tmp/hooks"
+        # Also copy the firmware compression script
+        if [[ -f "${SCRIPT_DIR}/alpine/scripts/compress-firmware.sh" ]]; then
+            cp "${SCRIPT_DIR}/alpine/scripts/compress-firmware.sh" "${ROOTFS_DIR}/tmp/hooks/"
+        fi
+    fi
+
+    # Copy mkinitfs config
+    if [[ -f "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" ]]; then
+        cp "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" "${ROOTFS_DIR}/tmp/hooks/"
     fi
 
     # Run setup inside chroot

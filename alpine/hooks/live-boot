@@ -1,14 +1,29 @@
 #!/bin/sh
-# SuperLite OS — Live boot hook for mkinitfs
-# Detects boot=live parameter and mounts squashfs rootfs
+# ============================================================================
+# SuperLite OS — mkinitfs feature hook
+# Registers live-boot support in the initramfs
+# ============================================================================
+# This hook is installed as a mkinitfs feature.
+# It ensures the live-boot init script is included in the initramfs.
+# ============================================================================
 
-# This script is sourced during initramfs init
-# It should be placed in /etc/mkinitfs/features.d/ or referenced in mkinitfs.conf
+# Feature: superlite-live
+# Adds live-boot support with squashfs overlay to initramfs
 
-# The actual live-boot logic is handled by the initramfs init script
-# This hook just ensures the right modules and binaries are included
+# Required kernel modules
+for mod in isofs squashfs loop overlay usb-storage sd_mod sr_mod mmc_block vfat nls_cp437 nls_iso8859_1; do
+    echo "$mod"
+done > "${DESTDIR:-/}/etc/modules" 2>/dev/null || true
 
-# Include necessary modules
-for mod in overlay squashfs loop isofs; do
-    echo "$mod" >> "${DESTDIR}/etc/modules"
-done 2>/dev/null
+# Install the live-boot init script
+if [ -f /tmp/hooks/superlite-live.init ]; then
+    install -D -m 0755 /tmp/hooks/superlite-live.init "${DESTDIR:-/}/sbin/init.live"
+fi
+
+# Include required binaries in initramfs
+for bin in switch_root mount umount modprobe sleep mkdir ls cat mountpoint; do
+    binpath=$(command -v "$bin" 2>/dev/null)
+    if [ -n "$binpath" ] && [ -f "$binpath" ]; then
+        install -D -m 0755 "$binpath" "${DESTDIR:-/}/bin/$bin" 2>/dev/null || true
+    fi
+done

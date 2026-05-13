@@ -46,8 +46,8 @@ echo "${VERSION}" > "${ISO_DIR}/superlite/version.txt"
 echo "SuperLite OS" >> "${ISO_DIR}/superlite/version.txt"
 echo "Alpine Linux + LabWC Wayland" >> "${ISO_DIR}/superlite/version.txt"
 
-# ── Copy kernel and initramfs from rootfs ─────────────────────────────────────
-log "Copying kernel and initramfs..."
+# ── Copy kernel from rootfs ───────────────────────────────────────────────────
+log "Copying kernel..."
 KVER=$(ls "${ROOTFS}/boot/vmlinuz-"* 2>/dev/null | head -1 | xargs basename 2>/dev/null | sed 's/vmlinuz-//' || echo "lts")
 
 if [[ -f "${ROOTFS}/boot/vmlinuz-${KVER}" ]]; then
@@ -58,16 +58,91 @@ else
         || { echo "ERROR: No kernel found in rootfs"; exit 1; }
 fi
 
-if [[ -f "${ROOTFS}/boot/initramfs-${KVER}" ]]; then
-    cp "${ROOTFS}/boot/initramfs-${KVER}" "${ISO_DIR}/boot/initramfs-lts"
-elif [[ -f "${ROOTFS}/boot/initramfs-lts" ]]; then
-    cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts"
-elif [[ -f "${ROOTFS}/boot/initramfs-virt" ]]; then
-    cp "${ROOTFS}/boot/initramfs-virt" "${ISO_DIR}/boot/initramfs-lts"
-else
-    log "WARNING: No initramfs found — generating via mkinitfs..."
-    chroot "${ROOTFS}" mkinitfs -o /boot/initramfs-lts 2>/dev/null || true
-    cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts" 2>/dev/null || true
+# ── Regenerate initramfs with live-boot support ───────────────────────────────
+log "Checking initramfs for live-boot support..."
+INITRAMFS_OK=false
+
+# Try to regenerate initramfs inside the rootfs if mkinitfs is available
+if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; then
+    log "Regenerating initramfs with live-boot hooks in chroot..."
+    # Mount virtual fs for chroot
+    mount --bind /dev     "${ROOTFS}/dev"     2>/dev/null || true
+    mount --bind /dev/pts "${ROOTFS}/dev/pts" 2>/dev/null || true
+    mount --bind /proc    "${ROOTFS}/proc"    2>/dev/null || true
+    mount --bind /sys     "${ROOTFS}/sys"     2>/dev/null || true
+
+    KVER=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "lts")
+    if [[ -n "$KVER" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER" ]]; then
+        chroot "${ROOTFS}" mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -5 || true
+        if [[ -f "${ROOTFS}/boot/initramfs-lts" ]]; then
+            cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts"
+            INITRAMFS_OK=true
+            log "Regenerated initramfs with live-boot support"
+        fi
+    fi
+
+    umount "${ROOTFS}/sys"     2>/dev/null || true
+    umount "${ROOTFS}/proc"    2>/dev/null || true
+    umount "${ROOTFS}/dev/pts" 2>/dev/null || true
+    umount "${ROOTFS}/dev"     2>/dev/null || true
+fi
+
+# Fallback: copy existing initramfs from rootfs
+if [[ "$INITRAMFS_OK" != true ]]; then
+    log "Using pre-built initramfs from rootfs..."
+    for initrd in \
+        "${ROOTFS}/boot/initramfs-lts" \
+        "${ROOTFS}/boot/initramfs-${KVER}" \
+        "${ROOTFS}/boot/initramfs-virt"; do
+        if [[ -f "$initrd" ]]; then
+            cp "$initrd" "${ISO_DIR}/boot/initramfs-lts"
+            INITRAMFS_OK=true
+            log "Copied initramfs: $initrd"
+            break
+        fi
+    done
+fi
+
+# Last resort: generate minimal initramfs on build host
+if [[ "$INITRAMFS_OK" != true ]]; then
+    log "WARNING: No initramfs found — generating minimal one..."
+    # Create a minimal initramfs with live-boot support
+    INITRAMFS_DIR="/tmp/superlite-initramfs"
+    rm -rf "$INITRAMFS_DIR"
+    mkdir -p "$INITRAMFS_DIR"/{bin,lib,lib64,proc,sys,dev,sbin,live,mnt}
+
+    # Copy busybox from rootfs for initramfs utilities
+    if [[ -f "${ROOTFS}/bin/busybox" ]]; then
+        cp "${ROOTFS}/bin/busybox" "$INITRAMFS_DIR/bin/busybox"
+        # Create symlinks for common utilities
+        for util in sh mount umount modprobe sleep mkdir ls cat switch_root mountpoint; do
+            ln -sf /bin/busybox "$INITRAMFS_DIR/bin/$util" 2>/dev/null || true
+        done
+    fi
+
+    # Copy the live-boot init
+    if [[ -f "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" ]]; then
+        cp "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" "$INITRAMFS_DIR/init"
+        cp "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" "$INITRAMFS_DIR/sbin/init"
+        chmod +x "$INITRAMFS_DIR/init" "$INITRAMFS_DIR/sbin/init"
+    fi
+
+    # Copy kernel modules (essential ones only)
+    KVER=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "lts")
+    if [[ -n "$KVER" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER" ]]; then
+        mkdir -p "$INITRAMFS_DIR/lib/modules/$KVER"
+        for mod in isofs squashfs loop overlay usb-storage sd_mod sr_mod mmc_block vfat nls_cp437 nls_iso8859_1; do
+            find "${ROOTFS}/lib/modules/$KVER" -name "${mod}.ko*" -exec cp {} "$INITRAMFS_DIR/lib/modules/$KVER/" \; 2>/dev/null || true
+        done
+        # Copy module deps
+        cp "${ROOTFS}/lib/modules/$KVER/modules.dep" "$INITRAMFS_DIR/lib/modules/$KVER/" 2>/dev/null || true
+        cp "${ROOTFS}/lib/modules/$KVER/modules.alias" "$INITRAMFS_DIR/lib/modules/$KVER/" 2>/dev/null || true
+    fi
+
+    # Pack into cpio.gz
+    (cd "$INITRAMFS_DIR" && find . | cpio -o -H newc 2>/dev/null | gzip -9 > "${ISO_DIR}/boot/initramfs-lts")
+    rm -rf "$INITRAMFS_DIR"
+    log "Generated minimal initramfs with live-boot support"
 fi
 
 # ── Create squashfs of rootfs ─────────────────────────────────────────────────
