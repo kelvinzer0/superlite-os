@@ -160,19 +160,14 @@ chmod 440 /etc/sudoers.d/live
 
 # ── Shell profiles ──────────────────────────────────────────────────────────
 echo "[setup] Setting up shell profiles..."
-
 cat > /etc/profile.d/xdg.sh << 'PROFILE'
 export XDG_RUNTIME_DIR="/tmp/$(id -u)-runtime-dir"
 mkdir -pm 0700 "$XDG_RUNTIME_DIR" 2>/dev/null
 export XDG_RUNTIME_DIR
 export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=wlroots
 export QT_QPA_PLATFORM=wayland
-export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
-export SDL_VIDEODRIVER=wayland
-export _JAVA_AWT_WM_NONREPARENTING=1
 PROFILE
 
 # ── Copy dotfiles to /etc/skel ──────────────────────────────────────────────

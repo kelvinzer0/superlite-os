@@ -1,65 +1,38 @@
 # ============================================================================
-# SuperLite OS — Package List (Minimal)
-# Only what BusyBox can't provide. ~150 packages target.
+# SuperLite OS — Package List (Ultra Minimal)
+# ~60 explicit packages, ~100-120 with deps. BusyBox handles the rest.
 # ============================================================================
 
-# --- Base (OpenRC + BusyBox handles the rest) ---
+# --- Base ---
 alpine-base
 openrc
 busybox
 busybox-suid
-util-linux
-e2fsprogs
 
 # --- Kernel + Targeted Firmware ---
 linux-lts
 linux-firmware-i915
 linux-firmware-amdgpu
-linux-firmware-amd
 linux-firmware-amd-ucode
 linux-firmware-ath10k
-linux-firmware-ath11k
-linux-firmware-ath12k
 linux-firmware-rtlwifi
-linux-firmware-rtw88
 linux-firmware-rtw89
 linux-firmware-rtl_bt
 linux-firmware-brcm
-linux-firmware-realtek
 linux-firmware-cirrus
 linux-firmware-other
 
-# --- Wayland compositor (minimal) ---
+# --- Wayland (bare minimum to render a desktop) ---
 labwc
-waybar
 foot
-wl-clipboard
-wlr-randr
-brightnessctl
-
-# --- Desktop apps (bare minimum) ---
-pcmanfm
-micro
-
-# --- Audio (PipeWire stack) ---
-pipewire
-pipewire-pulse
-wireplumber
+mesa-dri-gallium
+seatd
+dbus
 
 # --- Networking ---
 networkmanager
-networkmanager-wifi
-openssh-client
 
-# --- Graphics ---
-mesa-dri-gallium
-
-# --- System services ---
-seatd
-dbus
-polkit
-
-# --- Boot ---
+# --- Boot (ISO only, not runtime) ---
 grub-efi
 grub-bios
 syslinux
