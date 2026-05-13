@@ -236,6 +236,26 @@ EOF
 
 # ── Clean up ───────────────────────────────────────────────────────────────
 echo "[setup] Cleaning up..."
+
+# Remove boot files that are copied to ISO separately (not needed in squashfs)
+# Keep vmlinuz (needed by make-iso.sh to copy to ISO)
+rm -f /boot/initramfs-lts /boot/System.map /boot/config-*
+rm -rf /boot/grub
+
+# Strip debug symbols from all shared libraries and binaries
+find /usr/lib -name "*.so*" -type f -exec strip --strip-unneeded {} \; 2>/dev/null || true
+find /usr/bin /usr/sbin -type f -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# Remove docs, man pages, locale, i18n
+rm -rf /usr/share/man /usr/share/doc /usr/share/help /usr/share/gtk-doc
+rm -rf /usr/share/i18n /usr/share/locale/*
+rm -rf /usr/share/mime/packages/freedesktop.org.xml
+
+# Remove pkgconfig, cmake, development files
+rm -rf /usr/lib/pkgconfig /usr/lib/cmake /usr/include
+rm -rf /usr/share/pkgconfig
+
+# Remove APK cache and temp files
 rm -rf /tmp/packages.list /tmp/repositories /tmp/dotfiles /tmp/setup-rootfs.sh /tmp/hooks
 apk cache clean 2>/dev/null
 rm -rf /var/cache/apk/*
