@@ -9,3 +9,10 @@ build/
 .cache/
 *.log
 tmp/
+
+# Build artifacts (binary blobs)
+iso/boot/
+iso/EFI/
+iso/live/
+build/
+*.iso

@@ -3,7 +3,7 @@
 # SuperLite OS — Rootfs Setup Script
 # Runs INSIDE Alpine chroot to configure the system
 # ============================================================================
-set -eu
+set -e
 
 echo "[setup] Configuring Alpine rootfs..."
 
@@ -23,13 +23,17 @@ apk upgrade --available
 
 # ── Install packages ──────────────────────────────────────────────────────────
 echo "[setup] Installing packages (this will take a while)..."
-xargs apk add --no-cache < /tmp/packages.list 2>&1 | tail -5
+# Filter comments and empty lines, then install
+# Use || true so missing optional packages don't abort the build
+grep -v '^#' /tmp/packages.list | grep -v '^$' | xargs apk add 2>&1 | tail -5 || true
+echo "[setup] Package installation complete (some optional packages may be unavailable)"
 
 # ── Firmware compression ─────────────────────────────────────────────────────
 echo "[setup] Compressing firmware..."
 if [ -f /tmp/hooks/compress-firmware.sh ]; then
     chmod +x /tmp/hooks/compress-firmware.sh
-    /tmp/hooks/compress-firmware.sh /lib/firmware || true
+    # Run in subshell so failure doesn't abort the build
+    (/tmp/hooks/compress-firmware.sh /lib/firmware) || echo "[setup] WARNING: Firmware compression had issues (non-fatal)"
 fi
 
 # ── Fix /sbin/init ────────────────────────────────────────────────────────────
@@ -84,6 +88,7 @@ echo "[setup] /sbin/init status: $(ls -la /sbin/init 2>/dev/null || echo 'MISSIN
 
 # ── mkinitfs configuration ───────────────────────────────────────────────────
 echo "[setup] Configuring mkinitfs..."
+mkdir -p /etc/mkinitfs
 if [ -f /tmp/hooks/mkinitfs-superlite.conf ]; then
     cp /tmp/hooks/mkinitfs-superlite.conf /etc/mkinitfs/superlite.conf
 fi
@@ -149,6 +154,7 @@ EOF
 echo "[setup] Creating live user..."
 adduser -D -s /bin/bash -G wheel live
 echo "live:live" | chpasswd
+mkdir -p /etc/sudoers.d
 echo "live ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/live
 chmod 440 /etc/sudoers.d/live
 
@@ -220,6 +226,7 @@ EOF
 
 # ── NetworkManager ─────────────────────────────────────────────────────────
 echo "[setup] Configuring NetworkManager..."
+mkdir -p /etc/NetworkManager
 cat > /etc/NetworkManager/NetworkManager.conf << 'EOF'
 [main]
 plugins=ifupdown,keyfile

@@ -17,7 +17,7 @@ FIRMWARE_DIR="${1:-/lib/firmware}"
 LIVE_LOG() { echo "[firmware] $*"; }
 
 if [ ! -d "$FIRMWARE_DIR" ]; then
-    LIVE_LOG "WARNING: Firmware directory not found: $FIRMWARE_DIR"
+    LIVE_LOG "Firmware directory not found: $FIRMWARE_DIR (will be available after linux-firmware install)"
     exit 0
 fi
 
@@ -70,7 +70,7 @@ rm -rf "$FIRMWARE_DIR"/brcm 2>/dev/null || true  # Broadcom ARM (keep x86 brcm b
 
 # Broadcom wireless for RPi / ARM boards (we keep x86 Broadcom below)
 rm -rf "$FIRMWARE_DIR"/brcm/brcmfmac43455* 2>/dev/null || true
-rm -rf "$Firmware_DIR"/brcm/brcmfmac43430* 2>/dev/null || true
+rm -rf "$FIRMWARE_DIR"/brcm/brcmfmac43430* 2>/dev/null || true
 
 # GPU firmware for non-desktop GPUs (server/compute)
 rm -rf "$FIRMWARE_DIR"/amdgpu/denoise_* 2>/dev/null || true
