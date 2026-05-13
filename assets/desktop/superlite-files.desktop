@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Files
-Comment=SuperLite File Manager
-Exec=superlite-files
-Icon=system-file-manager
-Type=Application
-Categories=System;FileManager;
-Keywords=files;file manager;browser;

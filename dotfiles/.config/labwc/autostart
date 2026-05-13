@@ -1,0 +1,39 @@
+#!/bin/sh
+# SuperLite OS — LabWC autostart
+
+# Wallpaper
+swaybg -m fill -i /usr/share/backgrounds/superlite-wallpaper.png &
+# Fallback solid color if no wallpaper
+# swaybg -c "#0f0f23" &
+
+# Status bar
+waybar &
+
+# Notification daemon
+mako &
+
+# Screen idle
+swayidle -w \
+    timeout 300 'swaylock -c 0f0f23' \
+    timeout 600 'swaymsg "output * power off"' \
+    resume 'swaymsg "output * power on"' &
+
+# Audio
+pipewire &
+pipewire-pulse &
+wireplumber &
+
+# Night light (uncomment and adjust lat/lon for your location)
+# gammastep -l 48.8:2.3 &
+
+# Clipboard manager
+wl-paste --watch cliphist store &
+
+# Polkit agent
+/usr/libexec/polkit-gnome-authentication-agent-1 &
+
+# DBus session (if not already)
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null &
+
+# Create Pictures dir
+mkdir -p ~/Pictures

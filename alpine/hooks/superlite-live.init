@@ -1,0 +1,40 @@
+#!/bin/sh
+# SuperLite OS — Live boot init overlay
+# Called during initramfs boot when boot=live is detected
+
+# Mount the ISO
+ISO_DEV=""
+for dev in /dev/sr0 /dev/sda /dev/sdb /dev/sdc /dev/mmcblk0; do
+    if [ -b "$dev" ]; then
+        mkdir -p /media/iso
+        mount -t iso9660 "$dev" /media/iso 2>/dev/null && ISO_DEV="$dev" && break
+    fi
+done
+
+if [ -z "$ISO_DEV" ]; then
+    echo "[live] No ISO device found, continuing normal boot..."
+    return 0
+fi
+
+# Find squashfs
+SQUASHFS="/media/iso/live/rootfs.squashfs"
+if [ ! -f "$SQUASHFS" ]; then
+    echo "[live] No rootfs.squashfs found, continuing normal boot..."
+    umount /media/iso 2>/dev/null
+    return 0
+fi
+
+# Mount squashfs
+mkdir -p /live/rootfs
+mount -t squashfs "$SQUASHFS" /live/rootfs || { echo "[live] Failed to mount squashfs"; return 1; }
+
+# Create overlay
+mkdir -p /live/overlay /live/work
+mount -t tmpfs tmpfs /live/overlay
+mount -t overlay overlay \
+    -o lowerdir=/live/rootfs,upperdir=/live/overlay,workdir=/live/work \
+    /live/merged
+
+# Switch root
+echo "[live] Switching to live root..."
+exec switch_root /live/merged /sbin/init

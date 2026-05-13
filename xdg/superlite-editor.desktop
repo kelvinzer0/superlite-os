@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Text Editor
-Comment=SuperLite Text Editor
-Exec=superlite-editor
-Icon=accessories-text-editor
-Type=Application
-Categories=Utility;TextEditor;
-Keywords=text;editor;code;notepad;

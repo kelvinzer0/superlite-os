@@ -1,0 +1,46 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 32,
+    "spacing": 4,
+    "modules-left": ["wlr/workspaces"],
+    "modules-center": ["clock"],
+    "modules-right": ["network", "pulseaudio", "battery", "tray"],
+    "wlr/workspaces": {
+        "format": "{name}",
+        "on-click": "activate",
+        "sort-by-number": true
+    },
+    "clock": {
+        "format": " {:%a %d %b  %H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-charging": " {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "tooltip": false
+    },
+    "network": {
+        "format-wifi": " {signalStrength}%",
+        "format-ethernet": " {ifname}",
+        "format-disconnected": " Offline",
+        "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": " Muted",
+        "format-icons": {
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+    "tray": {
+        "icon-size": 14,
+        "spacing": 6
+    }
+}

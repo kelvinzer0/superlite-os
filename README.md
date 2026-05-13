@@ -1,145 +1,144 @@
-# SuperLite OS
+# ⚡ SuperLite OS
 
-Ultra-lightweight Linux distribution untuk bootable flashdisk. Custom desktop environment berbasis Python + GTK4, hanya dengan 4 aplikasi inti: Terminal, File Manager, Text Editor, Chrome Browser.
+Ultra-lightweight Alpine Linux desktop with LabWC Wayland compositor. Boots from USB, runs entirely in RAM. ~400MB ISO, ~1.5GB installed.
 
-## Arsitektur
+## Features
 
-```
-superlite-os/
-├── core/                  # Desktop Environment
-│   ├── session/           # Session manager (entry point)
-│   ├── wm/                # Window Manager (tiling + floating)
-│   ├── panel/             # Taskbar & system tray
-│   ├── launcher/          # App launcher (dmenu-style)
-│   └── theme/             # Theming engine
-├── apps/                  # Built-in applications
-│   ├── terminal/          # Terminal emulator (GTK4 VTE)
-│   ├── filemanager/       # File manager
-│   ├── texteditor/        # Text editor
-│   └── browser/           # Chrome launcher
-├── drivers/               # Driver & bootable tools
-│   ├── dump/              # Host driver dump utility
-│   ├── crosschain/        # Cross-chain bootable builder
-│   └── firmware/          # Firmware extraction
-├── build/                 # Build system
-│   ├── builder.py         # Main build orchestrator
-│   ├── configs/           # System configs (default.json)
-│   └── scripts/           # Build scripts
-├── build-and-run.sh       # ⚡ Full pipeline: dump → build → QEMU + noVNC
-├── demo.sh                # Quick demo (Xvfb mode, no disk image)
-├── assets/                # Themes, icons, wallpapers
-└── utils/                 # Shared utilities
-```
+- **Alpine Linux edge** — minimal, musl-based, openrc init
+- **LabWC Wayland** — tiling/floating compositor (openbox-like)
+- **Waybar** — modern status bar with workspaces, clock, system tray
+- **Foot** — fast Wayland-native terminal
+- **PipeWire** — audio stack with PulseAudio compatibility
+- **NetworkManager** — WiFi + wired networking
+- **Auto-login** — boots straight to desktop
+- **Dual boot** — UEFI (GRUB) + Legacy BIOS (syslinux)
+- **Rufus & Ventoy** — compatible with both tools
+
+## Included Software
+
+| Category | Apps |
+|----------|------|
+| Terminal | Foot |
+| File Manager | PCManFM |
+| Text Editor | Micro, Neovim |
+| Browser | Firefox |
+| Launcher | Tofi (rofi-style) |
+| Notifications | Mako |
+| Audio | PipeWire + WirePlumber |
+| Screenshot | Grim + Slurp |
 
 ## Quick Start
 
-### Option 1: Demo Mode (Xvfb, no disk image)
+### Build
+
 ```bash
-# Install deps
-apt install python3-gi gir1.2-gtk-4.0 openbox x11vnc novnc websockify cloudflared
+# Install build dependencies (Debian/Ubuntu)
+sudo apt install squashfs-tools xorriso mtools dosfstools \
+    wget ca-certificates syslinux
 
-# Run demo
-./demo.sh
+# Build ISO
+make build
+# or
+sudo ./build.sh
 ```
 
-### Option 2: Full Build + QEMU (bootable disk image)
+### Boot
+
+**USB (dd mode):**
 ```bash
-# Install deps
-apt install debootstrap xorriso qemu-system-x86 python3-gi gir1.2-gtk-4.0 \
-    openbox x11vnc novnc websockify
-# cloudflared: https://github.com/cloudflare/cloudflared/releases
-
-# Build + run
-sudo ./build-and-run.sh
+sudo dd if=superlite-os-*.iso of=/dev/sdX bs=4M status=progress
 ```
 
-### Option 3: Manual Build
+**Rufus:** Select ISO → ISO mode or DD mode → Write
+
+**Ventoy:** Copy ISO to Ventoy USB drive, boot from it
+
+**QEMU:**
 ```bash
-# 1. Dump host drivers
-python3 -c "from drivers.dump import DriverDump; DriverDump().dump_all()"
-
-# 2. Build rootfs
-sudo debootstrap --arch amd64 --variant=minbase \
-    --include systemd,systemd-sysv,dbus,xorg,openbox,xinit,python3-gi,gir1.2-gtk-4.0 \
-    bookworm ~/.superlite/build/rootfs http://deb.debian.org/debian
-
-# 3. Copy SuperLite DE into rootfs
-cp -r core apps assets ~/.superlite/build/rootfs/usr/share/superlite/
-
-# 4. Configure auto-boot (see build-and-run.sh for full config)
-
-# 5. Build disk image
-python3 -m superlite.build --target iso
-
-# 6. Run with QEMU
-qemu-system-x86_64 -m 512 -hda ~/.superlite/build/superlite-os.img -vnc :0
+make test-qemu
+# or with UEFI:
+make test-qemu-efi
 ```
 
-## Boot Flow
-
-```
-BIOS/UEFI → GRUB → Linux Kernel → systemd
-  → getty@tty1 (auto-login root)
-  → startx
-  → xinitrc
-    → openbox (Window Manager)
-    → SuperLite DE (Python GTK4)
-      → Panel (taskbar + systray)
-      → Window Manager (tiling/floating)
-      → App Launcher
-```
-
-## Default Keybindings
+## Keybindings
 
 | Key | Action |
 |-----|--------|
-| `Super+Return` | App Launcher |
-| `Super+q` | Close window |
-| `Super+j/k` | Focus next/prev |
-| `Super+f` | Toggle maximize |
-| `Super+m` | Minimize |
-| `Super+space` | Toggle floating |
-| `Super+1-4` | Switch workspace |
+| `Super+Return` | Terminal (Foot) |
+| `Super+d` | App Launcher (Tofi) |
 | `Super+e` | File Manager |
-| `Super+n` | Text Editor |
-| `Super+b` | Browser |
+| `Super+q` | Close window |
+| `Super+f` | Toggle maximize |
+| `Super+Space` | Toggle floating |
+| `Super+1-4` | Switch workspace |
+| `Super+l` | Lock screen |
+| `Print` | Screenshot |
+| `Alt+Print` | Area screenshot |
+| Right-click desktop | App menu |
 
-## Configuration
+## Architecture
 
-Config file: `build/configs/default.json` (copied to `/etc/superlite/config.json`)
-
-```json
-{
-  "wm": { "gap": 4, "layout": "tiling", "keybindings": {...} },
-  "panel": { "position": "top", "height": 36 },
-  "theme": { "name": "midnight", "bg": "#0f0f23", "accent": "#e94560" },
-  "terminal": { "font": "Monospace 11" },
-  "editor": { "font": "Monospace 13", "tab_width": 4 }
-}
 ```
+superlite-os/
+├── build.sh                    # Main build script
+├── alpine/
+│   ├── configs/
+│   │   ├── packages.list       # All Alpine packages
+│   │   └── repositories        # Alpine edge repos
+│   └── scripts/
+│       ├── setup-rootfs.sh     # Rootfs configuration (runs in chroot)
+│       └── make-iso.sh         # ISO generation (UEFI + Legacy hybrid)
+├── dotfiles/                   # Desktop config files
+│   └── .config/
+│       ├── labwc/              # Window manager config
+│       ├── waybar/             # Status bar config
+│       ├── foot/               # Terminal config
+│       ├── mako/               # Notifications config
+│       ├── tofi/               # App launcher config
+│       └── scripts/            # Utility scripts
+├── iso/                        # ISO boot structure
+│   ├── boot/grub/              # GRUB (UEFI)
+│   ├── boot/syslinux/          # Syslinux (Legacy BIOS)
+│   └── EFI/BOOT/               # EFI boot binary
+├── Makefile                    # Build targets
+└── tests/                      # Build tests
+```
+
+## Build Process
+
+1. Downloads Alpine minirootfs (x86_64)
+2. Creates chroot rootfs
+3. Installs packages via `apk`
+4. Applies LabWC + Waybar + desktop dotfiles
+5. Enables services (seatd, dbus, NetworkManager)
+6. Compresses rootfs to squashfs
+7. Generates hybrid ISO with dual boot:
+   - **Legacy BIOS:** syslinux/isolinux with MBR
+   - **UEFI:** GRUB EFI binary
+8. Result: ISO works with dd, Rufus (ISO+DD), and Ventoy
+
+## Customization
+
+**Change packages:** Edit `alpine/configs/packages.list`
+
+**Change dotfiles:** Edit files in `dotfiles/.config/`
+
+**Change boot menu:** Edit `iso/boot/grub/grub.cfg` or `iso/boot/syslinux/isolinux.cfg`
+
+**Add wallpaper:** Place image as `dotfiles/.config/labwc/wallpaper.png`
 
 ## Requirements
 
-- Python 3.10+
-- PyGObject (GTK4)
-- libgtk-4-dev
-- debootstrap (build time)
-- xorriso (ISO generation)
-- QEMU (testing)
+### Build Host
+- Linux (Debian/Ubuntu recommended)
+- Root access (for chroot)
+- ~2GB free disk space
+- Internet connection
 
-## Driver Dump (Cross-Chain)
-
-Dump host hardware drivers untuk di-embed ke bootable image:
-
-```bash
-python3 -m superlite.drivers.dump
-# Output: ~/.superlite/driver-dump/
-#   ├── manifest.json
-#   ├── modules/ (*.ko files)
-#   └── firmware/ (firmware blobs)
-```
-
-Supports: GPU, network, storage, USB, input, audio, bluetooth, WiFi, virtual.
+### Runtime
+- x86_64 CPU
+- 512MB RAM minimum (1GB+ recommended)
+- USB drive or Ventoy
 
 ## License
 

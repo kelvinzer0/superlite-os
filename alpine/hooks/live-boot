@@ -1,0 +1,14 @@
+#!/bin/sh
+# SuperLite OS — Live boot hook for mkinitfs
+# Detects boot=live parameter and mounts squashfs rootfs
+
+# This script is sourced during initramfs init
+# It should be placed in /etc/mkinitfs/features.d/ or referenced in mkinitfs.conf
+
+# The actual live-boot logic is handled by the initramfs init script
+# This hook just ensures the right modules and binaries are included
+
+# Include necessary modules
+for mod in overlay squashfs loop isofs; do
+    echo "$mod" >> "${DESTDIR}/etc/modules"
+done 2>/dev/null

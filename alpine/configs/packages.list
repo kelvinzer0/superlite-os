@@ -1,0 +1,110 @@
+# ============================================================================
+# SuperLite OS — Package List
+# Alpine Linux edge packages for a minimal LabWC Wayland desktop
+# ============================================================================
+
+# --- Base system ---
+alpine-base
+openrc
+busybox
+busybox-initscripts
+util-linux
+e2fsprogs
+coreutils
+grep
+sed
+gawk
+findutils
+file
+
+# --- Kernel ---
+linux-lts
+linux-firmware
+linux-firmware-i915
+linux-firmware-other
+
+# --- Wayland compositor & tools ---
+labwc
+waybar
+foot
+swaybg
+swayidle
+wlr-randr
+wl-clipboard
+grim
+slurp
+wtype
+brightnessctl
+
+# --- Desktop applications ---
+tofi
+mako
+pcmanfm
+micro
+firefox
+thunar
+adwaita-icon-theme
+gtk-update-icon-cursor
+xdg-utils
+xdg-user-dirs
+
+# --- Audio ---
+pipewire
+pipewire-pulse
+wireplumber
+alsa-utils
+alsa-ucm-conf
+
+# --- Networking ---
+networkmanager
+networkmanager-cli
+networkmanager-wifi
+wpa_supplicant
+openssh
+openssh-client
+
+# --- Fonts ---
+font-dejavu
+font-jetbrains-mono
+font-awesome
+font-terminus
+font-tamzen
+
+# --- Graphics ---
+mesa-dri-gallium
+mesa-va-gallium
+libva-intel-driver
+libva-utils
+vulkan-loader
+
+# --- System services ---
+seatd
+dbus
+polkit
+shadow
+tlp
+chrony
+
+# --- Shell & tools ---
+bash
+bash-completion
+curl
+git
+htop
+neovim
+lazygit
+less
+man-pages
+
+# --- Boot & ISO ---
+grub-efi
+grub-bios
+syslinux
+squashfs-tools
+xorriso
+mkinitfs
+mtools
+dosfstools
+
+# --- Theme / Appearance ---
+simp1e-adw-cursors
