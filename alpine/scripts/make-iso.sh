@@ -270,22 +270,27 @@ fi
 
 # ── Copy syslinux BIOS boot files ─────────────────────────────────────────────
 log "Installing syslinux BIOS boot files..."
+# Search in rootfs first, then host system paths
 for f in isolinux.bin ldlinux.c32 libutil.c32 libcom32.c32 vesamenu.c32 menu.c32; do
-    src="/usr/lib/syslinux/bios/$f"  # Debian/Ubuntu path
-    [[ -f "$src" ]] || src="/usr/lib/syslinux/$f"  # Alpine path
-    [[ -f "$src" ]] && cp "$src" "${ISO_DIR}/boot/syslinux/" 2>/dev/null || true
-done
-# Also check for ISOLINUX
-for f in isolinux.bin ldlinux.c32; do
-    if [[ ! -f "${ISO_DIR}/boot/syslinux/$f" ]]; then
-        src="/usr/lib/ISOLINUX/$f"
-        [[ -f "$src" ]] && cp "$src" "${ISO_DIR}/boot/syslinux/" 2>/dev/null || true
-    fi
+    src=""
+    # Try rootfs paths first (Alpine package installs here)
+    for search in \
+        "${ROOTFS}/usr/share/syslinux/$f" \
+        "${ROOTFS}/usr/lib/syslinux/$f" \
+        "${ROOTFS}/usr/lib/syslinux/bios/$f" \
+        "/usr/lib/syslinux/bios/$f" \
+        "/usr/lib/syslinux/$f" \
+        "/usr/lib/ISOLINUX/$f"; do
+        [[ -f "$search" ]] && src="$search" && break
+    done
+    [[ -n "$src" ]] && cp "$src" "${ISO_DIR}/boot/syslinux/" 2>/dev/null || true
 done
 
 # ── Find isohdpfx.bin for hybrid MBR ─────────────────────────────────────────
 ISOHDPFX=""
 for path in \
+    "${ROOTFS}/usr/share/syslinux/isohdpfx.bin" \
+    "${ROOTFS}/usr/lib/syslinux/isohdpfx.bin" \
     /usr/lib/ISOLINUX/isohdpfx.bin \
     /usr/lib/syslinux/bios/isohdpfx.bin \
     /usr/lib/syslinux/isohdpfx.bin \

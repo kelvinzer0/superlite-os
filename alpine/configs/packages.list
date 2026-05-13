@@ -1,102 +1,65 @@
 # ============================================================================
-# SuperLite OS — Package List
-# Alpine Linux edge packages for a minimal LabWC Wayland desktop
+# SuperLite OS — Package List (Minimal)
+# Only what BusyBox can't provide. ~150 packages target.
 # ============================================================================
 
-# --- Base system ---
+# --- Base (OpenRC + BusyBox handles the rest) ---
 alpine-base
 openrc
 busybox
 busybox-suid
 util-linux
 e2fsprogs
-coreutils
-grep
-sed
-gawk
-findutils
-file
 
-# --- Kernel ---
+# --- Kernel + Targeted Firmware ---
 linux-lts
-linux-firmware
 linux-firmware-i915
+linux-firmware-amdgpu
+linux-firmware-amd
+linux-firmware-amd-ucode
+linux-firmware-ath10k
+linux-firmware-ath11k
+linux-firmware-ath12k
+linux-firmware-rtlwifi
+linux-firmware-rtw88
+linux-firmware-rtw89
+linux-firmware-rtl_bt
+linux-firmware-brcm
+linux-firmware-realtek
+linux-firmware-cirrus
 linux-firmware-other
 
-# --- Wayland compositor & tools ---
+# --- Wayland compositor (minimal) ---
 labwc
 waybar
 foot
-swaybg
-swayidle
-wlr-randr
 wl-clipboard
-grim
-slurp
-wtype
+wlr-randr
 brightnessctl
 
-# --- Desktop applications ---
-tofi
-mako
+# --- Desktop apps (bare minimum) ---
 pcmanfm
 micro
-firefox
-thunar
-adwaita-icon-theme
-xdg-utils
-xdg-user-dirs
 
-# --- Audio ---
+# --- Audio (PipeWire stack) ---
 pipewire
 pipewire-pulse
 wireplumber
-alsa-utils
-alsa-ucm-conf
 
 # --- Networking ---
 networkmanager
-networkmanager-cli
 networkmanager-wifi
-wpa_supplicant
-openssh
 openssh-client
-
-# --- Fonts ---
-font-dejavu
-font-jetbrains-mono
-font-awesome
-font-terminus
-font-tamzen
 
 # --- Graphics ---
 mesa-dri-gallium
-mesa-va-gallium
-libva-intel-driver
-libva-utils
-vulkan-loader
 
 # --- System services ---
 seatd
 dbus
 polkit
-shadow
-tlp
-chrony
 
-# --- Shell & tools ---
-bash
-bash-completion
-curl
-git
-htop
-neovim
-lazygit
-less
-man-pages
-sudo
-
-# --- Boot & ISO ---
+# --- Boot ---
 grub-efi
 grub-bios
 syslinux
