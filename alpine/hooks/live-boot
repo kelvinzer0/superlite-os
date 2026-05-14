@@ -35,6 +35,15 @@ fi
 for bin in switch_root mount umount modprobe sleep mkdir ls cat mountpoint \
            setsid cttyhack mdev udevd udevadm blkid findmnt; do
     binpath=$(command -v "$bin" 2>/dev/null)
+    # Fallback: cari di rootfs Alpine (untuk cttyhack yang tidak ada di host Ubuntu)
+    if [ -z "$binpath" ]; then
+        for rootfs_path in \
+            "${ROOTFS:-/}/bin/$bin" \
+            "${ROOTFS:-/}/usr/bin/$bin" \
+            "${ROOTFS:-/}/sbin/$bin"; do
+            [ -f "$rootfs_path" ] && binpath="$rootfs_path" && break
+        done
+    fi
     if [ -n "$binpath" ] && [ -f "$binpath" ]; then
         install -D -m 0755 "$binpath" "${DESTDIR:-/}/bin/$bin" 2>/dev/null || true
     fi

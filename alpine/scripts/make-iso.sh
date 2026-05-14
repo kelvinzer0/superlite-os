@@ -84,13 +84,40 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             # Do NOT replace /init with superlite-live.init — it fails in initramfs context.
             # Alpine's init + SuperLite fallback (_superlite_find_media) handles boot media.
 
+            # ── Inject busybox.static for missing applets (cttyhack, setsid, findmnt) ──
+            # Alpine's dynamic busybox may not include all applets needed in initramfs
+            if [[ ! -f "$IRD_DIR/bin/busybox" ]]; then
+                for bb_src in \
+                    "${ROOTFS}/bin/busybox.static" \
+                    "${ROOTFS}/usr/bin/busybox" \
+                    "${ROOTFS}/bin/busybox"; do
+                    if [[ -f "$bb_src" ]]; then
+                        cp "$bb_src" "$IRD_DIR/bin/busybox"
+                        chmod +x "$IRD_DIR/bin/busybox"
+                        log "Copied $(basename $bb_src) as busybox to initramfs"
+                        break
+                    fi
+                done
+            fi
+
+            if [[ -f "${ROOTFS}/bin/busybox.static" ]]; then
+                cp "${ROOTFS}/bin/busybox.static" "$IRD_DIR/bin/busybox.static" 2>/dev/null || true
+                chmod +x "$IRD_DIR/bin/busybox.static" 2>/dev/null || true
+                for applet in cttyhack setsid findmnt; do
+                    if [[ ! -e "$IRD_DIR/bin/$applet" ]]; then
+                        ln -sf /bin/busybox.static "$IRD_DIR/bin/$applet"
+                        log "Linked $applet → busybox.static in initramfs"
+                    fi
+                done
+            fi
+
             # Create missing busybox symlinks
             if [[ -f "$IRD_DIR/bin/busybox" ]]; then
                 for applet in setsid cttyhack blkid findmnt switch_root \
                               mdev mountpoint sleep mkdir ls cat mount umount \
                               modprobe grep sed awk head tail wc tr cut losetup \
                               sh ash echo test expr true false \
-                              printf readlink basename dirname wc; do
+                              printf readlink basename dirname; do
                     [[ -e "$IRD_DIR/bin/$applet" ]] || \
                         ln -sf /bin/busybox "$IRD_DIR/bin/$applet" 2>/dev/null
                 done
@@ -106,17 +133,26 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             KVER_IRD=$(ls "$IRD_DIR/lib/modules/" 2>/dev/null | head -1 || echo "")
             if [[ -n "$KVER_IRD" ]]; then
                 for mod in squashfs loop isofs sr_mod usb-storage sd_mod nls_cp437 nls_iso8859_1; do
-                    if ! find "$IRD_DIR/lib/modules/$KVER_IRD" -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" 2>/dev/null | grep -q .; then
+                    if ! find "$IRD_DIR/lib/modules/$KVER_IRD" \
+                         \( -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" \) 2>/dev/null | grep -q .; then
                         log "WARNING: $mod module missing in initrd — copying from rootfs..."
                         KVER_ROOT=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "")
                         if [[ -n "$KVER_ROOT" ]]; then
-                            find "${ROOTFS}/lib/modules/$KVER_ROOT" \( -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" \) \
-                                -exec cp {} "$IRD_DIR/lib/modules/$KVER_IRD/kernel/" \; 2>/dev/null
+                            while IFS= read -r -d '' mod_file; do
+                                rel_path="${mod_file#${ROOTFS}/lib/modules/$KVER_ROOT/}"
+                                dest_dir="$IRD_DIR/lib/modules/$KVER_IRD/$(dirname "$rel_path")"
+                                mkdir -p "$dest_dir"
+                                cp "$mod_file" "$dest_dir/" 2>/dev/null && \
+                                    log "  Copied $mod → $(dirname $rel_path)/"
+                            done < <(find "${ROOTFS}/lib/modules/$KVER_ROOT" \
+                                \( -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" \) \
+                                -print0 2>/dev/null)
                         fi
                     fi
                 done
-                # Regenerate modules.dep in initrd
+                # Regenerate modules.dep after all modules are copied
                 if command -v depmod >/dev/null 2>&1 && [[ -n "$KVER_IRD" ]]; then
+                    log "Regenerating modules.dep in initramfs..."
                     depmod -a -b "$IRD_DIR" "$KVER_IRD" 2>/dev/null || true
                 fi
             fi
@@ -241,17 +277,17 @@ insmod gfxterm
 terminal_output gfxterm
 
 menuentry "SuperLite OS (Live)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 loglevel=7
+    linux /boot/vmlinuz-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 loglevel=7
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Safe Mode)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 nomodeset loglevel=7
+    linux /boot/vmlinuz-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 nomodeset loglevel=7
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Console)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 3
+    linux /boot/vmlinuz-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 3
     initrd /boot/initramfs-lts
 }
 GRUBCFG
@@ -276,17 +312,17 @@ MENU COLOR border   * #FFFFFFFF #FF000000 *
 LABEL superlite
     MENU LABEL SuperLite OS (Live)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 loglevel=7
+    APPEND initrd=/boot/initramfs-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 loglevel=7
 
 LABEL safe
     MENU LABEL SuperLite OS (Safe Mode)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 nomodeset loglevel=7
+    APPEND initrd=/boot/initramfs-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 nomodeset loglevel=7
 
 LABEL console
     MENU LABEL SuperLite OS (Console)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 3
+    APPEND initrd=/boot/initramfs-lts boot=live alpine_dev=cdrom:iso9660 console=ttyS0,115200 3
 SYSLINUX
 
 # ── UEFI Boot (GRUB EFI binary) ──────────────────────────────────────────────
