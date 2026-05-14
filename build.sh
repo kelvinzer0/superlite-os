@@ -179,6 +179,12 @@ configure_rootfs() {
         fi
     fi
 
+    # Copy theme installer script
+    if [[ -f "${SCRIPT_DIR}/alpine/scripts/install-themes.sh" ]]; then
+        mkdir -p "${ROOTFS_DIR}/tmp/hooks"
+        cp "${SCRIPT_DIR}/alpine/scripts/install-themes.sh" "${ROOTFS_DIR}/tmp/hooks/"
+    fi
+
     # Copy mkinitfs config
     if [[ -f "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" ]]; then
         cp "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" "${ROOTFS_DIR}/tmp/hooks/"

@@ -28,6 +28,15 @@ echo "[setup] Installing packages (this will take a while)..."
 grep -v '^#' /tmp/packages.list | grep -v '^$' | xargs apk add 2>&1 | tail -5 || true
 echo "[setup] Package installation complete (some optional packages may be unavailable)"
 
+# ── Install external themes (OhSnap, Haiku, WhiteSur) ─────────────────────
+echo "[setup] Installing external themes..."
+if [ -f /tmp/hooks/install-themes.sh ]; then
+    chmod +x /tmp/hooks/install-themes.sh
+    (/tmp/hooks/install-themes.sh) || echo "[setup] WARNING: Theme install had issues (non-fatal)"
+else
+    echo "[setup] No theme installer found, skipping"
+fi
+
 # ── Firmware compression ─────────────────────────────────────────────────────
 echo "[setup] Compressing firmware..."
 if [ -f /tmp/hooks/compress-firmware.sh ]; then
