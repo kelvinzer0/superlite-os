@@ -30,6 +30,27 @@ jobs:
       - name: Test ISO
         run: ./tests/test-build.sh
 
+      - name: Test ISO with QEMU
+        run: |
+          sudo apt-get install -y qemu-system-x86_64 qemu-utils
+          qemu-img create -f qcow2 testdisk.qcow2 2G
+          timeout 60s qemu-system-x86_64 \
+            -cdrom superlite-os-*.iso \
+            -drive file=testdisk.qcow2,format=qcow2 \
+            -m 2G \
+            -cpu host \
+            -machine accel=kvm \
+            -nographic \
+            -serial mon:stdio \
+            -append "console=ttyS0 quiet" \
+            | tee boot.log || true
+          # Cek apakah boot berhasil sampai login prompt
+          if ! grep -q "login:" boot.log && ! grep -q "superlite" boot.log; then
+            echo "Kernel panic or boot failed! Showing last 50 lines:"
+            tail -50 boot.log
+            exit 1
+          fi
+
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
