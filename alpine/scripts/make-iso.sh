@@ -88,6 +88,16 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
                 (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
                 cp "$SUPERLITE_INIT" "$IRD_DIR/init"
                 chmod +x "$IRD_DIR/init"
+                # Create missing busybox symlinks needed by superlite-live.init
+                # (setsid, cttyhack, blkid, findmnt, switch_root etc.)
+                if [[ -f "$IRD_DIR/bin/busybox" ]]; then
+                    for applet in setsid cttyhack blkid findmnt switch_root \
+                                  mdev mountpoint sleep mkdir ls cat mount umount \
+                                  modprobe grep sed awk head tail wc tr cut; do
+                        [[ -e "$IRD_DIR/bin/$applet" ]] || \
+                            ln -sf /bin/busybox "$IRD_DIR/bin/$applet" 2>/dev/null
+                    done
+                fi
                 (cd "$IRD_DIR" && find . | cpio -o -H newc 2>/dev/null | gzip -9 > "${ROOTFS}/boot/initramfs-lts")
                 rm -rf "$IRD_DIR"
                 log "Initramfs patched: /init is now superlite-live.init"
