@@ -80,27 +80,72 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             # That init doesn't know how to mount squashfs rootfs.
             # We replace /init with superlite-live.init which handles:
             #   devtmpfs → find boot media → mount squashfs → overlay → switch_root
-            SUPERLITE_INIT="${ROOTFS}/etc/mkinitfs/superlite-live.init"
-            if [[ -f "$SUPERLITE_INIT" ]]; then
-                log "Patching initramfs: replacing /init with superlite-live.init..."
+            SUPERLITE_INIT_LUA="${ROOTFS}/etc/mkinitfs/superlite-live.init.lua"
+            SUPERLITE_INIT_SH="${ROOTFS}/etc/mkinitfs/superlite-live.init"
+            if [[ -f "$SUPERLITE_INIT_LUA" ]] || [[ -f "$SUPERLITE_INIT_SH" ]]; then
+                log "Patching initramfs: installing live-boot init..."
                 IRD_DIR="/tmp/superlite-ird-patch"
                 rm -rf "$IRD_DIR" && mkdir -p "$IRD_DIR"
                 (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
-                cp "$SUPERLITE_INIT" "$IRD_DIR/init"
-                chmod +x "$IRD_DIR/init"
-                # Create missing busybox symlinks needed by superlite-live.init
-                # (setsid, cttyhack, blkid, findmnt, switch_root etc.)
+
+                # Create missing busybox symlinks
                 if [[ -f "$IRD_DIR/bin/busybox" ]]; then
                     for applet in setsid cttyhack blkid findmnt switch_root \
                                   mdev mountpoint sleep mkdir ls cat mount umount \
-                                  modprobe grep sed awk head tail wc tr cut; do
+                                  modprobe grep sed awk head tail wc tr cut losetup; do
                         [[ -e "$IRD_DIR/bin/$applet" ]] || \
                             ln -sf /bin/busybox "$IRD_DIR/bin/$applet" 2>/dev/null
                     done
                 fi
+
+                # ── Install Lua init (preferred) or shell init (fallback) ──
+                USE_LUA=false
+                if [[ -f "$SUPERLITE_INIT_LUA" ]]; then
+                    # Check if lua binary exists in initrd or rootfs
+                    if [[ -f "$IRD_DIR/bin/lua" ]] || [[ -f "${ROOTFS}/usr/bin/lua5.4" ]]; then
+                        USE_LUA=true
+                        # Copy lua binary into initrd if missing
+                        if [[ ! -f "$IRD_DIR/bin/lua" ]]; then
+                            cp "${ROOTFS}/usr/bin/lua5.4" "$IRD_DIR/bin/lua" 2>/dev/null || \
+                                cp "${ROOTFS}/usr/bin/lua" "$IRD_DIR/bin/lua" 2>/dev/null || \
+                                USE_LUA=false
+                        fi
+                    fi
+                fi
+
+                if [[ "$USE_LUA" == true ]]; then
+                    cp "$SUPERLITE_INIT_LUA" "$IRD_DIR/init"
+                    chmod +x "$IRD_DIR/init"
+                    log "Initramfs: using Lua-based init (superlite-live.init.lua)"
+                elif [[ -f "$SUPERLITE_INIT_SH" ]]; then
+                    cp "$SUPERLITE_INIT_SH" "$IRD_DIR/init"
+                    chmod +x "$IRD_DIR/init"
+                    log "Initramfs: using shell-based init (superlite-live.init)"
+                fi
+
+                # ── Verify critical modules are in initrd ──
+                # squashfs and loop must be present for live-boot
+                KVER_IRD=$(ls "$IRD_DIR/lib/modules/" 2>/dev/null | head -1 || echo "")
+                if [[ -n "$KVER_IRD" ]]; then
+                    for mod in squashfs loop isofs; do
+                        if ! find "$IRD_DIR/lib/modules/$KVER_IRD" -name "${mod}.ko*" | grep -q .; then
+                            log "WARNING: $mod module missing in initrd — copying from rootfs..."
+                            KVER_ROOT=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "")
+                            if [[ -n "$KVER_ROOT" ]]; then
+                                find "${ROOTFS}/lib/modules/$KVER_ROOT" -name "${mod}.ko*" \
+                                    -exec cp {} "$IRD_DIR/lib/modules/$KVER_IRD/kernel/" \; 2>/dev/null
+                            fi
+                        fi
+                    done
+                    # Regenerate modules.dep in initrd
+                    if command -v depmod >/dev/null 2>&1 && [[ -n "$KVER_IRD" ]]; then
+                        depmod -a -b "$IRD_DIR" "$KVER_IRD" 2>/dev/null || true
+                    fi
+                fi
+
                 (cd "$IRD_DIR" && find . | cpio -o -H newc 2>/dev/null | gzip -9 > "${ROOTFS}/boot/initramfs-lts")
                 rm -rf "$IRD_DIR"
-                log "Initramfs patched: /init is now superlite-live.init"
+                log "Initramfs patched successfully"
             fi
             cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts"
             INITRAMFS_OK=true

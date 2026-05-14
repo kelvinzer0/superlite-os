@@ -1,0 +1,72 @@
+#!/bin/sh
+# ============================================================================
+# SuperLite OS — mkinitfs feature hook
+# Ensures all required modules, binaries, and the Lua init are in the initramfs
+# ============================================================================
+
+# ── Include kernel modules ───────────────────────────────────────────────────
+for mod in \
+    kernel/drivers/scsi/scsi_mod \
+    kernel/drivers/scsi/scsi_common \
+    kernel/drivers/cdrom/cdrom \
+    kernel/drivers/scsi/sr_mod \
+    kernel/drivers/ata/libata \
+    kernel/drivers/ata/ata_piix \
+    kernel/drivers/ata/ahci \
+    kernel/drivers/usb/common/usb-common \
+    kernel/drivers/usb/core/usbcore \
+    kernel/drivers/usb/host/xhci-hcd \
+    kernel/drivers/usb/host/ehci-hcd \
+    kernel/drivers/usb/host/ohci-hcd \
+    kernel/drivers/usb/host/uhci-hcd \
+    kernel/drivers/usb/storage/usb-storage \
+    kernel/drivers/scsi/sd_mod \
+    kernel/drivers/mmc/core \
+    kernel/drivers/nvme/host/nvme \
+    kernel/drivers/block/loop \
+    kernel/fs/isofs \
+    kernel/fs/squashfs \
+    kernel/fs/overlayfs \
+    kernel/fs/fat \
+    kernel/fs/vfat \
+    kernel/fs/ext4 \
+    kernel/lib/crc16 \
+    kernel/fs/nls/nls_cp437 \
+    kernel/fs/nls/nls_iso8859-1 \
+    kernel/fs/nls/nls_ascii; do
+    echo "$mod"
+done
+
+# ── Include required binaries ────────────────────────────────────────────────
+for bin in switch_root mount umount modprobe insmod sleep mkdir ls cat \
+           mountpoint mdev blkid findmnt losetup zcat grep sed; do
+    binpath=$(command -v "$bin" 2>/dev/null)
+    if [ -n "$binpath" ] && [ -f "$binpath" ]; then
+        install -D -m 0755 "$binpath" "${DESTDIR:-/}/bin/$bin" 2>/dev/null || true
+    fi
+done
+
+# ── Include Lua interpreter ─────────────────────────────────────────────────
+for luabin in /usr/bin/lua5.4 /usr/bin/lua; do
+    if [ -f "$luabin" ]; then
+        install -D -m 0755 "$luabin" "${DESTDIR:-/}/bin/lua" 2>/dev/null || true
+        break
+    fi
+done
+
+# Install Lua init script
+if [ -f /tmp/hooks/superlite-live.init.lua ]; then
+    install -D -m 0755 /tmp/hooks/superlite-live.init.lua "${DESTDIR:-/}/init.lua"
+fi
+
+# Fallback: shell init
+if [ -f /tmp/hooks/superlite-live.init ]; then
+    install -D -m 0755 /tmp/hooks/superlite-live.init "${DESTDIR:-/}/init.sh"
+fi
+
+# Ensure /bin/sh
+if [ ! -e "${DESTDIR:-/}/bin/sh" ] && [ -e "${DESTDIR:-/}/bin/busybox" ]; then
+    ln -sf busybox "${DESTDIR:-/}/bin/sh" 2>/dev/null || true
+fi
+
+mkdir -p "${DESTDIR:-/}/dev/pts" "${DESTDIR:-/}/dev/shm" 2>/dev/null || true
