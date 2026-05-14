@@ -23,33 +23,47 @@ apk upgrade --available
 
 # ── Install packages ──────────────────────────────────────────────────────────
 echo "[setup] Installing packages (this will take a while)..."
-# Filter comments and empty lines, then install
-# Use || true so missing optional packages don't abort the build
-grep -v '^#' /tmp/packages.list | grep -v '^$' | xargs apk add 2>&1 | tail -5 || true
-echo "[setup] Package installation complete (some optional packages may be unavailable)"
+# Install one by one so a single missing package doesn't kill the entire install
+FAILED_PKGS=""
+INSTALLED=0
+SKIPPED=0
+while IFS= read -r pkg; do
+    # Skip comments and empty lines
+    case "$pkg" in
+        '#'*|'') continue ;;
+    esac
+    if apk add "$pkg" 2>/dev/null; then
+        INSTALLED=$((INSTALLED + 1))
+    else
+        FAILED_PKGS="$FAILED_PKGS $pkg"
+        SKIPPED=$((SKIPPED + 1))
+        echo "[setup]   SKIP: $pkg (not available)"
+    fi
+done < /tmp/packages.list
+echo "[setup] Installed: $INSTALLED, Skipped: $SKIPPED"
+[ -n "$FAILED_PKGS" ] && echo "[setup] Skipped packages:$FAILED_PKGS"
 
 # ── Auto-resolve missing library dependencies ──────────────────────────────
 # Run ldd on critical binaries to find any "not found" deps, then install them
 echo "[setup] Resolving library dependencies for critical binaries..."
 DE_BINARIES="/usr/bin/labwc /usr/bin/foot /usr/bin/waybar /usr/bin/swaybg /usr/bin/swayidle /usr/bin/mako /usr/bin/brightnessctl /usr/bin/seatd /usr/bin/dbus-daemon /usr/bin/NetworkManager /usr/bin/tofi"
-MISSING_PKGS=""
+RESOLVED_PKGS=""
 for bin in $DE_BINARIES; do
     [ -x "$bin" ] || continue
     NOT_FOUND=$(ldd "$bin" 2>/dev/null | grep "Not found" | awk '{print $1}' || true)
     for lib in $NOT_FOUND; do
-        # Find which package provides this library
-        PKG=$(apk info --who-owns "$lib" 2>/dev/null | head -1 || true)
-        if [ -n "$PKG" ] && ! echo "$MISSING_PKGS" | grep -q "$PKG"; then
-            MISSING_PKGS="$MISSING_PKGS $PKG"
+        # Find which package provides this library using apk search
+        PKG=$(apk search -x "$lib" 2>/dev/null | head -1 || true)
+        if [ -z "$PKG" ]; then
+            # Try searching for the library file
+            PKG=$(apk search --owns "/usr/lib/$lib" 2>/dev/null | head -1 || true)
+        fi
+        if [ -n "$PKG" ] && ! echo "$RESOLVED_PKGS" | grep -q "$PKG"; then
+            RESOLVED_PKGS="$RESOLVED_PKGS $PKG"
             echo "[setup]   Need $PKG for $lib ($(basename "$bin"))"
         fi
     done
 done
-
-if [ -n "$MISSING_PKGS" ]; then
-    echo "[setup] Installing missing dependencies:$MISSING_PKGS"
-    apk add $MISSING_PKGS 2>&1 | tail -3 || true
-fi
 
 # Also check key shared libs
 for libpat in libwlroots libseat libwayland-server libwayland-client; do
@@ -57,14 +71,25 @@ for libpat in libwlroots libseat libwayland-server libwayland-client; do
     [ -z "$LIB_FILE" ] && continue
     NOT_FOUND=$(ldd "$LIB_FILE" 2>/dev/null | grep "Not found" | awk '{print $1}' || true)
     for lib in $NOT_FOUND; do
-        PKG=$(apk info --who-owns "$lib" 2>/dev/null | head -1 || true)
-        if [ -n "$PKG" ] && ! echo "$MISSING_PKGS" | grep -q "$PKG"; then
-            MISSING_PKGS="$MISSING_PKGS $PKG"
+        PKG=$(apk search -x "$lib" 2>/dev/null | head -1 || true)
+        if [ -z "$PKG" ]; then
+            PKG=$(apk search --owns "/usr/lib/$lib" 2>/dev/null | head -1 || true)
+        fi
+        if [ -n "$PKG" ] && ! echo "$RESOLVED_PKGS" | grep -q "$PKG"; then
+            RESOLVED_PKGS="$RESOLVED_PKGS $PKG"
             echo "[setup]   Need $PKG for $lib ($(basename "$LIB_FILE"))"
-            apk add "$PKG" 2>&1 | tail -1 || true
         fi
     done
 done
+
+if [ -n "$RESOLVED_PKGS" ]; then
+    echo "[setup] Installing resolved dependencies..."
+    for pkg in $RESOLVED_PKGS; do
+        apk add "$pkg" 2>/dev/null && echo "[setup]   Installed: $pkg" || echo "[setup]   Failed: $pkg"
+    done
+else
+    echo "[setup] No missing dependencies found."
+fi
 
 echo "[setup] Dependency resolution complete."
 
