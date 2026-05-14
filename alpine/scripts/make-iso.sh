@@ -75,6 +75,23 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
     if [[ -n "$KVER" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER" ]]; then
         chroot "${ROOTFS}" mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -5 || true
         if [[ -f "${ROOTFS}/boot/initramfs-lts" ]]; then
+            # ── CRITICAL FIX: Replace Alpine's /init with SuperLite's live-boot init ──
+            # mkinitfs generates an initramfs with Alpine's initramfs-init as /init.
+            # That init doesn't know how to mount squashfs rootfs.
+            # We replace /init with superlite-live.init which handles:
+            #   devtmpfs → find boot media → mount squashfs → overlay → switch_root
+            SUPERLITE_INIT="${ROOTFS}/etc/mkinitfs/superlite-live.init"
+            if [[ -f "$SUPERLITE_INIT" ]]; then
+                log "Patching initramfs: replacing /init with superlite-live.init..."
+                local IRD_DIR="/tmp/superlite-ird-patch"
+                rm -rf "$IRD_DIR" && mkdir -p "$IRD_DIR"
+                (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
+                cp "$SUPERLITE_INIT" "$IRD_DIR/init"
+                chmod +x "$IRD_DIR/init"
+                (cd "$IRD_DIR" && find . | cpio -o -H newc 2>/dev/null | gzip -9 > "${ROOTFS}/boot/initramfs-lts")
+                rm -rf "$IRD_DIR"
+                log "Initramfs patched: /init is now superlite-live.init"
+            fi
             cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts"
             INITRAMFS_OK=true
             log "Regenerated initramfs with live-boot support"
