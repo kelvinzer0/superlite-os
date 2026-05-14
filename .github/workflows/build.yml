@@ -22,8 +22,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             squashfs-tools xorriso mtools dosfstools \
-            wget ca-certificates syslinux syslinux-utils xz-utils cpio \
-            binutils
+            wget ca-certificates syslinux syslinux-utils xz-utils cpio
 
       - name: Build ISO
         run: sudo ./build.sh --verbose

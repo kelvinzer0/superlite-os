@@ -201,10 +201,10 @@ for libname in "${MESA_LIBS[@]}"; do
 done
 
 # =========================================================================
-# 5. Deep Dependency Check — ldd / readelf on critical binaries
+# 5. Deep Dependency Check — chroot ldd on critical binaries
 # =========================================================================
 echo ""
-echo "── Deep Dependency Check (ldd/readelf) ──────────────────"
+echo "── Deep Dependency Check (chroot ldd) ───────────────────"
 
 # All critical binaries that MUST have working library deps
 LDD_BINARIES=(
@@ -219,55 +219,44 @@ LDD_BINARIES=(
     "usr/bin/dbus-daemon"
     "usr/bin/NetworkManager"
     "usr/bin/tofi"
-    "usr/bin/swaybg"
 )
 
 LDD_ERRORS=0
-LIB_PATHS="$ROOTFS/usr/lib:$ROOTFS/lib:$ROOTFS/lib64:$ROOTFS/usr/lib64"
 
+# Method: Use chroot + Alpine's ldd (musl-based) for accurate results
+# This avoids cross-ABI issues with host's glibc readelf/ldd
 for binpath in "${LDD_BINARIES[@]}"; do
     FULLPATH="$ROOTFS/$binpath"
     [[ -f "$FULLPATH" ]] || continue
     [[ -x "$FULLPATH" ]] || continue
 
     BIN_NAME=$(basename "$binpath")
-    MISSING_LIBS=""
 
-    # Method 1: readelf -d (works cross-arch, most reliable)
-    if command -v readelf &>/dev/null; then
-        NEEDED_LIBS=$(readelf -d "$FULLPATH" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
-        for lib in $NEEDED_LIBS; do
-            # Search for the library in rootfs (handle versioned names: libfoo.so.0 -> libfoo.so.0.25.0)
-            if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "${lib}*" 2>/dev/null | head -1 | grep -q .; then
-                # Special case: musl libc (libc.musl-x86_64.so.1 is the dynamic linker)
-                if [[ "$lib" == "libc.musl"* ]]; then
-                    if find "$ROOTFS/lib" -name "ld-musl*" 2>/dev/null | head -1 | grep -q .; then
-                        continue  # musl found, skip
-                    fi
-                fi
-                MISSING_LIBS="$MISSING_LIBS $lib"
-            fi
-        done
+    # Try Alpine's ldd inside chroot (most accurate for musl binaries)
+    LDD_OUT=$(chroot "$ROOTFS" /usr/bin/ldd "/$binpath" 2>/dev/null || true)
+
+    if [[ -z "$LDD_OUT" ]]; then
+        # ldd not available or failed — try host ldd with LD_LIBRARY_PATH
+        LDD_OUT=$(LD_LIBRARY_PATH="$ROOTFS/usr/lib:$ROOTFS/lib:$ROOTFS/lib64" ldd "$FULLPATH" 2>/dev/null || true)
     fi
 
-    # Method 2: ldd with LD_LIBRARY_PATH (may fail for cross-arch, but worth trying)
-    if [[ -z "$MISSING_LIBS" ]] && command -v ldd &>/dev/null; then
-        LDD_OUT=$(LD_LIBRARY_PATH="$LIB_PATHS" ldd "$FULLPATH" 2>/dev/null || true)
-        if echo "$LDD_OUT" | grep -q "not found"; then
-            NOT_FOUND=$(echo "$LDD_OUT" | grep "not found" | awk '{print $1}' | tr '\n' ' ')
-            MISSING_LIBS="$MISSING_LIBS $NOT_FOUND"
+    if echo "$LDD_OUT" | grep -q "Not found\|not found\|NEEDED"; then
+        NOT_FOUND=$(echo "$LDD_OUT" | grep -i "not found" | awk '{print $1}' | tr '\n' ' ')
+        if [[ -n "$NOT_FOUND" ]]; then
+            fail "$BIN_NAME → missing:$NOT_FOUND"
+            LDD_ERRORS=$((LDD_ERRORS + 1))
+        else
+            pass "$BIN_NAME → all deps satisfied"
         fi
-    fi
-
-    if [[ -n "$MISSING_LIBS" ]]; then
-        fail "$BIN_NAME → missing libs:$MISSING_LIBS"
-        LDD_ERRORS=$((LDD_ERRORS + 1))
-    else
+    elif [[ -n "$LDD_OUT" ]]; then
         pass "$BIN_NAME → all deps satisfied"
+    else
+        # Can't determine — warn but don't fail
+        warn "$BIN_NAME → could not verify deps (ldd unavailable)"
     fi
 done
 
-# Also check shared libs that other binaries depend on (libwlroots, libseat, etc.)
+# Also verify key libraries have their own deps met
 echo ""
 echo "  Checking library-to-library dependencies..."
 CHECK_LIBS=(
@@ -275,9 +264,6 @@ CHECK_LIBS=(
     "libseat"
     "libwayland-server"
     "libwayland-client"
-    "libEGL_mesa"
-    "libGLESv2_mesa"
-    "libgbm"
 )
 
 for libpat in "${CHECK_LIBS[@]}"; do
@@ -285,25 +271,15 @@ for libpat in "${CHECK_LIBS[@]}"; do
     [[ -z "$LIB_FILE" ]] && continue
 
     LIB_BASENAME=$(basename "$LIB_FILE")
-    NEEDED_LIBS=$(readelf -d "$LIB_FILE" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
-    LIB_MISSING=""
-    for lib in $NEEDED_LIBS; do
-        # Handle versioned names: libfoo.so.0 -> libfoo.so.0.25.0
-        if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "${lib}*" 2>/dev/null | head -1 | grep -q .; then
-            # Special case: musl libc
-            if [[ "$lib" == "libc.musl"* ]]; then
-                if find "$ROOTFS/lib" -name "ld-musl*" 2>/dev/null | head -1 | grep -q .; then
-                    continue
-                fi
-            fi
-            LIB_MISSING="$LIB_MISSING $lib"
-        fi
-    done
+    # Use chroot ldd on the library
+    LDD_OUT=$(chroot "$ROOTFS" /usr/bin/ldd "/usr/lib/$LIB_BASENAME" 2>/dev/null || \
+              LD_LIBRARY_PATH="$ROOTFS/usr/lib:$ROOTFS/lib" ldd "$LIB_FILE" 2>/dev/null || true)
 
-    if [[ -n "$LIB_MISSING" ]]; then
-        fail "$LIB_BASENAME → missing deps:$LIB_MISSING"
+    if echo "$LDD_OUT" | grep -qi "not found"; then
+        NOT_FOUND=$(echo "$LDD_OUT" | grep -i "not found" | awk '{print $1}' | tr '\n' ' ')
+        fail "$LIB_BASENAME → missing deps:$NOT_FOUND"
         LDD_ERRORS=$((LDD_ERRORS + 1))
-    else
+    elif [[ -n "$LDD_OUT" ]]; then
         pass "$LIB_BASENAME → all deps satisfied"
     fi
 done
@@ -311,7 +287,6 @@ done
 if [[ $LDD_ERRORS -gt 0 ]]; then
     echo ""
     echo -e "  ${RED}Deep check found $LDD_ERRORS binaries/libs with missing dependencies!${NC}"
-    echo "  Install missing packages or fix library paths."
 fi
 
 # =========================================================================

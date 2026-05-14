@@ -28,6 +28,46 @@ echo "[setup] Installing packages (this will take a while)..."
 grep -v '^#' /tmp/packages.list | grep -v '^$' | xargs apk add 2>&1 | tail -5 || true
 echo "[setup] Package installation complete (some optional packages may be unavailable)"
 
+# ── Auto-resolve missing library dependencies ──────────────────────────────
+# Run ldd on critical binaries to find any "not found" deps, then install them
+echo "[setup] Resolving library dependencies for critical binaries..."
+DE_BINARIES="/usr/bin/labwc /usr/bin/foot /usr/bin/waybar /usr/bin/swaybg /usr/bin/swayidle /usr/bin/mako /usr/bin/brightnessctl /usr/bin/seatd /usr/bin/dbus-daemon /usr/bin/NetworkManager /usr/bin/tofi"
+MISSING_PKGS=""
+for bin in $DE_BINARIES; do
+    [ -x "$bin" ] || continue
+    NOT_FOUND=$(ldd "$bin" 2>/dev/null | grep "Not found" | awk '{print $1}' || true)
+    for lib in $NOT_FOUND; do
+        # Find which package provides this library
+        PKG=$(apk info --who-owns "$lib" 2>/dev/null | head -1 || true)
+        if [ -n "$PKG" ] && ! echo "$MISSING_PKGS" | grep -q "$PKG"; then
+            MISSING_PKGS="$MISSING_PKGS $PKG"
+            echo "[setup]   Need $PKG for $lib ($(basename "$bin"))"
+        fi
+    done
+done
+
+if [ -n "$MISSING_PKGS" ]; then
+    echo "[setup] Installing missing dependencies:$MISSING_PKGS"
+    apk add $MISSING_PKGS 2>&1 | tail -3 || true
+fi
+
+# Also check key shared libs
+for libpat in libwlroots libseat libwayland-server libwayland-client; do
+    LIB_FILE=$(find /usr/lib /lib -name "${libpat}*" -type f 2>/dev/null | head -1)
+    [ -z "$LIB_FILE" ] && continue
+    NOT_FOUND=$(ldd "$LIB_FILE" 2>/dev/null | grep "Not found" | awk '{print $1}' || true)
+    for lib in $NOT_FOUND; do
+        PKG=$(apk info --who-owns "$lib" 2>/dev/null | head -1 || true)
+        if [ -n "$PKG" ] && ! echo "$MISSING_PKGS" | grep -q "$PKG"; then
+            MISSING_PKGS="$MISSING_PKGS $PKG"
+            echo "[setup]   Need $PKG for $lib ($(basename "$LIB_FILE"))"
+            apk add "$PKG" 2>&1 | tail -1 || true
+        fi
+    done
+done
+
+echo "[setup] Dependency resolution complete."
+
 # ── Install external themes (OhSnap, Haiku, WhiteSur) ─────────────────────
 echo "[setup] Installing external themes..."
 if [ -f /tmp/hooks/install-themes.sh ]; then

@@ -42,6 +42,50 @@ gammastep
 brightnessctl
 gsettings-desktop-schemas
 
+# --- Libraries: Explicit deps for labwc/waybar/foot/mako/tofi ---
+# These should be pulled by apk deps, but we list them explicitly to be safe
+wayland-libs
+libxkbcommon
+libxcb
+xcb-util-wm
+cairo
+pango
+glib
+pixman
+libpng
+librsvg
+libinput
+libdrm
+fontconfig
+freetype
+harfbuzz
+fcft
+utf8proc
+elogind
+basu
+dbus-libs
+expat
+libffi
+jsoncpp
+gtk+3.0
+gtkmm3
+libnl3
+pipewire
+wireplumber
+eudev
+libmpdclient
+gtk-layer-shell
+libxkbregistry
+libsfdo
+spdlog
+fmt
+sndio
+playerctl
+upower
+libdisplay-info
+libliftoff
+vulkan-loader
+
 # --- Fonts & Cursors ---
 font-awesome
 font-terminus
