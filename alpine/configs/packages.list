@@ -42,6 +42,7 @@ gsettings-desktop-schemas
 # --- Fonts & Cursors ---
 font-awesome
 simp1e-cursors
+sassc
 
 # --- Networking ---
 networkmanager
