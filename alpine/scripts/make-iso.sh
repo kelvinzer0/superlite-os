@@ -75,34 +75,14 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
     if [[ -n "$KVER" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER" ]]; then
         chroot "${ROOTFS}" mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -5 || true
         if [[ -f "${ROOTFS}/boot/initramfs-lts" ]]; then
-            log "Patching initramfs: ensuring busybox applets, modules, and custom init..."
+            log "Patching initramfs: ensuring busybox applets and modules..."
             IRD_DIR="/tmp/superlite-ird-patch"
             rm -rf "$IRD_DIR" && mkdir -p "$IRD_DIR"
             (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
 
-            # ── Replace /init with SuperLite's custom live-boot init ──
-            # Alpine's patched init tries nlplug-findfs first (may hang on non-Alpine layouts).
-            # SuperLite's own init handles media detection directly — use it instead.
-            SUPERLITE_INIT=""
-            for candidate in \
-                "${ROOTFS}/tmp/hooks/superlite-live.init" \
-                "${SCRIPT_DIR}/../alpine/hooks/superlite-live.init" \
-                "${TOP_DIR}/alpine/hooks/superlite-live.init"; do
-                if [[ -f "$candidate" ]]; then
-                    SUPERLITE_INIT="$candidate"
-                    break
-                fi
-            done
-
-            if [[ -n "$SUPERLITE_INIT" ]]; then
-                log "Installing SuperLite live-boot init as /init"
-                # Back up Alpine's init as /init.alpine for debugging
-                [[ -f "$IRD_DIR/init" ]] && cp "$IRD_DIR/init" "$IRD_DIR/init.alpine"
-                cp "$SUPERLITE_INIT" "$IRD_DIR/init"
-                chmod +x "$IRD_DIR/init"
-            else
-                log "WARNING: superlite-live.init not found — using patched Alpine init"
-            fi
+            # ── Keep Alpine's patched init (patch-init.sh adds nlplug-findfs timeout) ──
+            # Do NOT replace /init with superlite-live.init — it fails in initramfs context.
+            # Alpine's init + SuperLite fallback (_superlite_find_media) handles boot media.
 
             # Create missing busybox symlinks
             if [[ -f "$IRD_DIR/bin/busybox" ]]; then
