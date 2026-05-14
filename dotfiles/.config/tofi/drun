@@ -1,0 +1,19 @@
+# SuperLite OS — Tofi drun launcher config
+
+font = Misc OhSnap
+font-size = 9
+background-color = #FFFACD
+text-color = #000000
+selection-color = #22AA99
+border-color = #000000
+border-width = 1
+outline-width = 0
+padding-left = 10
+padding-right = 10
+padding-top = 4
+padding-bottom = 4
+result-spacing = 4
+width = 300
+height = 400
+corner-radius = 0
+prompt-text = >

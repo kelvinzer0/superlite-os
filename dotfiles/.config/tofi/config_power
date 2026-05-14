@@ -1,0 +1,19 @@
+# SuperLite OS — Tofi power menu config
+
+font = Misc OhSnap
+font-size = 10
+background-color = #FFFACD
+text-color = #000000
+selection-color = #FF0000
+border-color = #000000
+border-width = 1
+outline-width = 0
+padding-left = 10
+padding-right = 10
+padding-top = 6
+padding-bottom = 6
+result-spacing = 8
+width = 180
+height = 160
+corner-radius = 0
+prompt-text = ⏻

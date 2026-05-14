@@ -1,22 +1,24 @@
-# SuperLite OS — LabWC theme
+# SuperLite OS — LabWC theme (LabWC-Alpine-Netbook style)
+# WhiteSur-Light inspired, lemon-chiffon accents
+
 border.width: 1
 padding.height: 3
-window.active.border.color: #89b4fa
-window.inactive.border.color: #45475a
-window.active.title.bg.color: #1e1e2e
-window.inactive.title.bg.color: #181825
-window.active.label.text.color: #cdd6f4
-window.inactive.label.text.color: #6c7086
+window.active.border.color: #000000
+window.inactive.border.color: #999999
+window.active.title.bg.color: #FFFACD
+window.inactive.title.bg.color: #f5f5dc
+window.active.label.text.color: #000000
+window.inactive.label.text.color: #666666
 window.label.text.justify: center
-window.active.button.unpressed.image.color: #cdd6f4
-window.inactive.button.unpressed.image.color: #6c7086
-menu.items.bg.color: #1e1e2e
-menu.items.text.color: #cdd6f4
-menu.items.active.bg.color: #313244
-menu.items.active.text.color: #cdd6f4
+window.active.button.unpressed.image.color: #000000
+window.inactive.button.unpressed.image.color: #666666
+menu.items.bg.color: #FFFACD
+menu.items.text.color: #000000
+menu.items.active.bg.color: #22AA99
+menu.items.active.text.color: #000000
 menu.items.padding.x: 7
 menu.items.padding.y: 4
-menu.separator.color: #45475a
-osd.bg.color: #1e1e2e
-osd.border.color: #89b4fa
-osd.label.text.color: #cdd6f4
+menu.separator.color: #000000
+osd.bg.color: #FFFACD
+osd.border.color: #000000
+osd.label.text.color: #000000

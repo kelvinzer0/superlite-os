@@ -1,6 +1,6 @@
 # ============================================================================
-# SuperLite OS — Package List (Ultra Minimal)
-# ~60 explicit packages, ~100-120 with deps. BusyBox handles the rest.
+# SuperLite OS — Package List (LabWC-Alpine-Netbook Style)
+# Minimal desktop with RiccardoPP's aesthetic. No bloat.
 # ============================================================================
 
 # --- Base ---
@@ -22,12 +22,26 @@ linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
 
-# --- Wayland (bare minimum to render a desktop) ---
+# --- Wayland Desktop ---
 labwc
 foot
 mesa-dri-gallium
 seatd
 dbus
+
+# --- Desktop Components (LabWC-Alpine-Netbook style) ---
+waybar
+swaybg
+swayidle
+mako
+tofi
+gammastep
+brightnessctl
+gsettings-desktop-schemas
+
+# --- Fonts ---
+font-awesome
+font-terminus
 
 # --- Networking ---
 networkmanager

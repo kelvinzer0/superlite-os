@@ -4,6 +4,12 @@
     <item label="Terminal">
       <action name="Execute"><command>foot</command></action>
     </item>
+    <item label="Browser">
+      <action name="Execute"><command>firefox</command></action>
+    </item>
+    <item label="Files">
+      <action name="Execute"><command>pcmanfm</command></action>
+    </item>
     <separator/>
     <item label="Reconfigure">
       <action name="Execute"><command>labwc -r</command></action>

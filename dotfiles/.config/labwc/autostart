@@ -1,13 +1,27 @@
 #!/bin/sh
-# SuperLite OS — LabWC autostart
-# Minimal: only what's actually installed
+# SuperLite OS — LabWC autostart (LabWC-Alpine-Netbook style)
+# Wallpaper + bar + notifications + night light
 
-# Background color (no swaybg — not installed)
-# LabWC uses solid color from environment
+# Wallpaper (solid color fallback if no image)
+swaybg -c f898d0 >/dev/null 2>&1 &
+
+# Status bar
+waybar >/dev/null 2>&1 &
+
+# Notifications
+mako >/dev/null 2>&1 &
+
+# Night light (5600K warm)
+gammastep -O 5600 2>&1 &
+
+# Auto-suspend after 10min idle
+swayidle -w timeout 600 'sudo zzz' 2>&1 &
 
 # Brightness
 brightnessctl set 80% 2>/dev/null &
 
-# GTK theme
-gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita' 2>/dev/null &
-gsettings set org.gnome.desktop.interface font-name 'DejaVu Sans 9' 2>/dev/null &
+# GTK theme — WhiteSur-Light aesthetic
+gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light' 2>&1 &
+gsettings set org.gnome.desktop.interface font-name 'Misc OhSnap 8' 2>&1 &
+gsettings set org.gnome.desktop.interface icon-theme 'Haiku' 2>&1 &
+gsettings set org.gnome.desktop.interface cursor-theme 'simp1e-cursors' 2>&1 &

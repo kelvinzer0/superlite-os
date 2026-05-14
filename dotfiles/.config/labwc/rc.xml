@@ -1,4 +1,8 @@
 <?xml version="1.0"?>
+<!--
+  SuperLite OS — LabWC config (LabWC-Alpine-Netbook style)
+  Based on RiccardoPP's dotfiles aesthetic
+-->
 <labwc_config>
   <core>
     <decoration>server</decoration>
@@ -14,32 +18,41 @@
   </placement>
 
   <theme>
-    <name>Adwaita</name>
+    <name>WhiteSur-Light</name>
     <cornerRadius>0</cornerRadius>
     <keepBorder>yes</keepBorder>
     <dropShadows>no</dropShadows>
     <font place="ActiveWindow">
-      <name>DejaVu Sans</name>
-      <size>9</size>
+      <name>Misc OhSnap</name>
+      <size>8</size>
+      <slant>normal</slant>
+      <weight>bold</weight>
     </font>
     <font place="InActiveWindow">
-      <name>DejaVu Sans</name>
-      <size>9</size>
+      <name>Misc OhSnap</name>
+      <size>8</size>
+      <slant>normal</slant>
+      <weight>bold</weight>
     </font>
     <font place="MenuItem">
-      <name>DejaVu Sans</name>
-      <size>9</size>
+      <name>Misc OhSnap</name>
+      <size>8</size>
+      <slant>normal</slant>
+      <weight>bold</weight>
     </font>
     <font place="OnScreenDisplay">
-      <name>DejaVu Sans</name>
-      <size>11</size>
+      <name>Misc OhSnap</name>
+      <size>12</size>
+      <slant>normal</slant>
+      <weight>normal</weight>
     </font>
   </theme>
 
   <windowSwitcher show="yes" preview="yes" outlines="yes" allWorkspaces="yes">
     <fields>
-      <field content="trimmed_identifier" width="30%"/>
-      <field content="title" width="65%"/>
+      <field content="workspace" width="25%"/>
+      <field content="trimmed_identifier" width="25%"/>
+      <field content="title" width="45%"/>
       <field content="type_short" width="5%"/>
     </fields>
   </windowSwitcher>
@@ -48,6 +61,7 @@
     <screenEdgeStrength>20</screenEdgeStrength>
     <windowEdgeStrength>20</windowEdgeStrength>
     <unSnapThreshold>20</unSnapThreshold>
+    <unMaximizeThreshold>150</unMaximizeThreshold>
   </resistance>
 
   <resize>
@@ -76,48 +90,71 @@
     <region name="top-left" x="0%" y="0%" height="50%" width="50%"/>
     <region name="top" x="0%" y="0%" height="60%" width="100%"/>
     <region name="top-right" x="50%" y="0%" height="50%" width="50%"/>
-    <region name="left" x="0%" y="0%" height="100%" width="50%"/>
+    <region name="left" x="0%" y="0%" height="100%" width="75%"/>
     <region name="center" x="17%" y="17%" height="66%" width="66%"/>
     <region name="center-big" x="0%" y="0%" height="100%" width="100%"/>
-    <region name="right" x="50%" y="0%" height="100%" width="50%"/>
+    <region name="right" x="75%" y="0%" height="100%" width="25%"/>
     <region name="bottom-left" x="0%" y="50%" height="50%" width="50%"/>
     <region name="bottom" x="0%" y="60%" height="40%" width="100%"/>
     <region name="bottom-right" x="50%" y="50%" height="50%" width="50%"/>
   </regions>
 
   <keyboard>
+    <numlock>off</numlock>
+    <layoutScope>global</layoutScope>
     <repeatRate>25</repeatRate>
     <repeatDelay>600</repeatDelay>
 
-    <!-- Window management -->
-    <keybind key="A-Tab">
+    <!-- Window switcher -->
+    <keybind key="W-Tab">
       <action name="NextWindow"/>
     </keybind>
+
+    <!-- Terminal -->
+    <keybind key="W-Return">
+      <action name="Execute" command="foot"/>
+    </keybind>
+    <keybind key="W-S-Return">
+      <action name="Execute" command="foot --override=colors.background=000000 --override=colors.foreground=ffffff"/>
+    </keybind>
+
+    <!-- Launcher -->
+    <keybind key="W-Space">
+      <action name="Execute" command="tofi-drun"/>
+    </keybind>
+
+    <!-- Close -->
+    <keybind key="W-S-q">
+      <action name="Close"/>
+    </keybind>
+
+    <!-- Reload -->
+    <keybind key="W-C-r">
+      <action name="Execute" command="labwc -r"/>
+    </keybind>
+
+    <!-- Power menu -->
+    <keybind key="W-S-e">
+      <action name="Execute" command="~/.config/scripts/tofi-power.sh"/>
+    </keybind>
+
+    <!-- Fullscreen -->
+    <keybind key="W-f">
+      <action name="ToggleFullscreen"/>
+    </keybind>
+
+    <!-- Window management -->
     <keybind key="A-S-Tab">
       <action name="PreviousWindow"/>
     </keybind>
     <keybind key="A-F4">
       <action name="Close"/>
     </keybind>
-    <keybind key="W-q">
-      <action name="Close"/>
-    </keybind>
-    <keybind key="W-f">
-      <action name="ToggleFullscreen"/>
-    </keybind>
     <keybind key="W-m">
       <action name="Iconify"/>
     </keybind>
     <keybind key="A-Space">
       <action name="ToggleFloating"/>
-    </keybind>
-    <keybind key="W-C-r">
-      <action name="Execute" command="labwc -r"/>
-    </keybind>
-
-    <!-- Terminal -->
-    <keybind key="W-Return">
-      <action name="Execute" command="foot"/>
     </keybind>
 
     <!-- Snap to edges -->

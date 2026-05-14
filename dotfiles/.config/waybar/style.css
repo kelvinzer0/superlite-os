@@ -1,0 +1,99 @@
+/*
+ * SuperLite OS — Waybar style (LabWC-Alpine-Netbook style)
+ * Lemon-chiffon (#FFFACD) + black, Misc OhSnap font
+ */
+
+* {
+    font-family: Misc Ohsnap, Font Awesome;
+    font-size: 9px;
+    margin-top: 1px;
+    font-weight: bold;
+}
+
+window#waybar {
+    background-color: transparent;
+    border-bottom: none;
+    color: #000000;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+button {
+    border: none;
+    border-radius: 0;
+}
+
+button:hover {
+    background: inherit;
+    box-shadow: none;
+}
+
+#taskbar {
+    padding-top: 0;
+    margin: 0;
+}
+
+#taskbar button {
+    background-color: #FFFACD;
+    margin-right: 2px;
+    color: black;
+    padding: 0 0 0 9px;
+    border: 1px solid black;
+}
+
+#taskbar button.active {
+    background-color: #22AA99;
+    color: black;
+}
+
+.modules-left {
+    margin: 0;
+    padding: 0;
+}
+
+.modules-right {
+    padding: 0 10px 0 15px;
+    background-color: #fffacd;
+    border: 1px solid black;
+}
+
+@keyframes blink {
+    to {
+        color: #000000;
+    }
+}
+
+#battery.critical:not(.charging) {
+    color: red;
+    animation-name: blink;
+    animation-duration: 1s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+label:focus {
+    background-color: #000000;
+}
+
+#clock {
+    margin-right: 5px;
+}
+
+#network.disconnected, #network.disabled {
+    color: gray;
+}
+
+tooltip {
+    background-color: #281733;
+    border: 1px solid black;
+    border-radius: 0;
+    padding: 0;
+}
+
+tooltip label {
+    color: white;
+    padding: 0 5px;
+}
