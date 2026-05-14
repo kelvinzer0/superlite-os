@@ -65,7 +65,13 @@ local function emergency_shell(msg)
     os.execute("setsid cttyhack /bin/sh -l 2>/dev/null || exec /bin/sh")
 end
 
-local KVER = "6.18.29-0-lts"
+-- Auto-detect kernel version from /lib/modules
+local function get_kver()
+    local h = io.popen("ls /lib/modules/ 2>/dev/null | head -1")
+    if h then local v = h:read("*l"); h:close(); return v end
+    return nil
+end
+local KVER = get_kver() or "6.18.29-0-lts"
 
 -- ── Step 1: Mount Virtual Filesystems ────────────────────────────────────────
 
@@ -283,13 +289,21 @@ exec_silent("mount --bind " .. ISO_MOUNT .. " /live/merged/media/iso")
 
 -- ── Step 9: Switch Root ─────────────────────────────────────────────────────
 
+-- NOTE: Do NOT unmount /proc, /sys, or /dev before switch_root.
+-- switch_root mount-moves all mountpoints to the new root automatically.
+-- OpenRC needs these filesystems to be present when it starts.
+
 log("Switching to live root...")
-exec_silent("umount /proc"); exec_silent("umount /sys")
 
 if not file_exists("/live/merged/sbin/init") then
     err("/sbin/init not found in merged root!")
     emergency_shell("Missing /sbin/init in merged root.")
 end
 
--- switch_root replaces PID 1 with the real init
-os.execute("switch_root /live/merged /sbin/init")
+-- switch_root replaces PID 1 with the real init.
+-- 'exec' ensures Lua process is replaced (no fork), so switch_root becomes PID 1.
+os.execute("exec switch_root /live/merged /sbin/init")
+
+-- If exec returns, something went wrong
+err("switch_root returned — this should never happen!")
+emergency_shell("switch_root failed.")

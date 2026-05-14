@@ -39,7 +39,8 @@ done
 
 # ── Include required binaries ────────────────────────────────────────────────
 for bin in switch_root mount umount modprobe insmod sleep mkdir ls cat \
-           mountpoint mdev blkid findmnt losetup zcat grep sed; do
+           mountpoint mdev blkid findmnt losetup zcat grep sed \
+           setsid cttyhack; do
     binpath=$(command -v "$bin" 2>/dev/null)
     if [ -n "$binpath" ] && [ -f "$binpath" ]; then
         install -D -m 0755 "$binpath" "${DESTDIR:-/}/bin/$bin" 2>/dev/null || true
