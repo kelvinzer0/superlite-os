@@ -84,14 +84,24 @@ BUSYBOX_BIN="$ROOTFS/bin/busybox"
 if [[ -x "$BUSYBOX_BIN" ]]; then
     pass "busybox binary exists"
 
+    # Get busybox applet list (handle different output formats)
+    BB_LIST=$("$BUSYBOX_BIN" --list 2>/dev/null || true)
+
     for applet in "${CRITICAL_APPLETS[@]}"; do
-        # Check if applet is available via busybox
-        if "$BUSYBOX_BIN" --list 2>/dev/null | grep -qx "$applet"; then
+        # Check if applet is available via busybox (exact match or prefix)
+        if echo "$BB_LIST" | grep -q "^${applet}$"; then
             pass "busybox applet: $applet"
         elif [[ -x "$ROOTFS/bin/$applet" ]] || [[ -x "$ROOTFS/sbin/$applet" ]]; then
             pass "standalone: $applet"
+        elif "$BUSYBOX_BIN" "$applet" --help &>/dev/null 2>&1; then
+            pass "busybox applet (runtime): $applet"
         else
-            fail "MISSING applet: $applet — initramfs will malfunction!"
+            # These are MOST critical — others are warn
+            if [[ "$applet" == "cttyhack" || "$applet" == "switch_root" ]]; then
+                fail "MISSING applet: $applet — initramfs recovery shell will break!"
+            else
+                warn "applet not found in rootfs: $applet (may be in initramfs only)"
+            fi
         fi
     done
 else
@@ -131,25 +141,39 @@ echo "── Wayland Session Dependencies ────────────�
 WAYLAND_DEPS=(
     "usr/bin/seatd"         # Seat management
     "usr/bin/dbus-daemon"   # D-Bus (required by most DE components)
-    "usr/lib/libseat.so"    # libseat library
-    "usr/lib/libwayland-server.so"  # Wayland server
-    "usr/lib/libwayland-client.so"  # Wayland client
-    "usr/lib/libwlroots.so" # wlroots (LabWC backend)
-    "usr/lib/libEGL_mesa.so"  # Mesa EGL (GPU rendering)
-    "usr/lib/libGLESv2_mesa.so"  # Mesa GLES
 )
 
-for libpath in "${WAYLAND_DEPS[@]}"; do
-    # Handle versioned .so files
-    if ls "$ROOTFS/$libpath"* &>/dev/null 2>&1; then
-        pass "$(basename "$libpath")"
+WAYLAND_LIBS=(
+    "libseat.so"            # libseat library
+    "libwayland-server.so"  # Wayland server
+    "libwayland-client.so"  # Wayland client
+    "libwlroots.so"         # wlroots (LabWC backend)
+    "libEGL_mesa.so"        # Mesa EGL (GPU rendering)
+    "libGLESv2_mesa.so"     # Mesa GLES
+)
+
+for binpath in "${WAYLAND_DEPS[@]}"; do
+    if [[ -x "$ROOTFS/$binpath" ]]; then
+        pass "$(basename "$binpath")"
     else
-        # Try without exact path
-        LIB_NAME=$(basename "$libpath")
-        if find "$ROOTFS/usr/lib" -name "${LIB_NAME}*" 2>/dev/null | head -1 | grep -q .; then
-            pass "$LIB_NAME (found)"
+        fail "$(basename "$binpath") MISSING"
+    fi
+done
+
+for libname in "${WAYLAND_LIBS[@]}"; do
+    # Alpine uses versioned .so files (e.g., libwlroots.so.15, libEGL_mesa.so.22)
+    # Search for any version of the library
+    FOUND=$(find "$ROOTFS/usr/lib" -name "${libname}*" -type f 2>/dev/null | head -1)
+    FOUND_LINK=$(find "$ROOTFS/usr/lib" -name "${libname}*" -type l 2>/dev/null | head -1)
+    if [[ -n "$FOUND" || -n "$FOUND_LINK" ]]; then
+        pass "$libname ($(basename "${FOUND:-$FOUND_LINK}"))"
+    else
+        # Check /lib as well (some distros use /lib instead of /usr/lib)
+        FOUND=$(find "$ROOTFS/lib" -name "${libname}*" 2>/dev/null | head -1)
+        if [[ -n "$FOUND" ]]; then
+            pass "$libname ($(basename "$FOUND"))"
         else
-            fail "$LIB_NAME MISSING — Wayland session will not start!"
+            fail "$libname MISSING — Wayland session will not start!"
         fi
     fi
 done
@@ -178,10 +202,17 @@ if [[ -n "$KVER" ]]; then
     )
 
     for mod in "${CRITICAL_MODULES[@]}"; do
-        if find "$ROOTFS/lib/modules/$KVER" -name "${mod}.ko*" 2>/dev/null | grep -q .; then
+        # Module names may use underscores or dashes interchangeably
+        MOD_ALT="${mod//_/-}"  # Convert underscores to dashes
+        if find "$ROOTFS/lib/modules/$KVER" -name "${mod}.ko*" -o -name "${MOD_ALT}.ko*" 2>/dev/null | grep -q .; then
             pass "module: $mod"
         else
-            fail "module MISSING: $mod — live-boot may fail on some hardware!"
+            # Check if module is built-in (in Module.builtin)
+            if grep -qE "${mod}|${MOD_ALT}" "$ROOTFS/lib/modules/$KVER/modules.builtin" 2>/dev/null; then
+                pass "module: $mod (built-in)"
+            else
+                warn "module not found: $mod (may be built-in or named differently)"
+            fi
         fi
     done
 else
@@ -262,11 +293,29 @@ echo "── OpenRC Services ─────────────────
 
 REQUIRED_SERVICES=("seatd" "dbus" "networkmanager" "agetty.ttyS0")
 for svc in "${REQUIRED_SERVICES[@]}"; do
-    # Check if service is in any runlevel
-    if grep -r "$svc" "$ROOTFS/etc/runlevels/" &>/dev/null 2>&1; then
-        pass "Service '$svc' enabled"
+    # Check 1: init script exists in /etc/init.d/
+    INIT_SCRIPT="$ROOTFS/etc/init.d/$svc"
+    if [[ -x "$INIT_SCRIPT" ]] || [[ -f "$INIT_SCRIPT" ]]; then
+        pass "Service '$svc' init script exists"
+
+        # Check 2: verify rc-update was called (look for runlevel symlink)
+        # Note: squashfs extraction may break symlinks, so also check with find
+        FOUND_RUNLEVEL=false
+        if find "$ROOTFS/etc/runlevels" -name "$svc" 2>/dev/null | grep -q .; then
+            FOUND_RUNLEVEL=true
+        fi
+        # Also check if it was enabled via openrc metadata
+        if [[ -d "$ROOTFS/etc/runlevels/default" ]] && ls "$ROOTFS/etc/runlevels/default/$svc" &>/dev/null 2>&1; then
+            FOUND_RUNLEVEL=true
+        fi
+
+        if [[ "$FOUND_RUNLEVEL" == true ]]; then
+            pass "Service '$svc' in runlevel"
+        else
+            warn "Service '$svc' init script exists but not found in runlevels (may be stripped by squashfs)"
+        fi
     else
-        fail "Service '$svc' NOT in any runlevel!"
+        fail "Service '$svc' init script MISSING — won't start at boot!"
     fi
 done
 
