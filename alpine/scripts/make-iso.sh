@@ -84,8 +84,9 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             # Do NOT replace /init with superlite-live.init — it fails in initramfs context.
             # Alpine's init + SuperLite fallback (_superlite_find_media) handles boot media.
 
-            # ── Inject busybox.static for missing applets (cttyhack, setsid, findmnt) ──
-            # Alpine's dynamic busybox may not include all applets needed in initramfs
+            # ── Inject busybox.static for missing applets ──
+            # Alpine's dynamic busybox may not include all applets needed in initramfs.
+            # cttyhack is optional — recovery_shell() falls back to /bin/busybox sh if missing.
             if [[ ! -f "$IRD_DIR/bin/busybox" ]]; then
                 for bb_src in \
                     "${ROOTFS}/bin/busybox.static" \
