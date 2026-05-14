@@ -201,7 +201,108 @@ for libname in "${MESA_LIBS[@]}"; do
 done
 
 # =========================================================================
-# 5. Kernel Modules — critical for live-boot
+# 5. Deep Dependency Check — ldd / readelf on critical binaries
+# =========================================================================
+echo ""
+echo "── Deep Dependency Check (ldd/readelf) ──────────────────"
+
+# All critical binaries that MUST have working library deps
+LDD_BINARIES=(
+    "usr/bin/labwc"
+    "usr/bin/foot"
+    "usr/bin/waybar"
+    "usr/bin/swaybg"
+    "usr/bin/swayidle"
+    "usr/bin/mako"
+    "usr/bin/brightnessctl"
+    "usr/bin/seatd"
+    "usr/bin/dbus-daemon"
+    "usr/bin/NetworkManager"
+    "usr/bin/tofi"
+    "usr/bin/swaybg"
+)
+
+LDD_ERRORS=0
+LIB_PATHS="$ROOTFS/usr/lib:$ROOTFS/lib:$ROOTFS/lib64:$ROOTFS/usr/lib64"
+
+for binpath in "${LDD_BINARIES[@]}"; do
+    FULLPATH="$ROOTFS/$binpath"
+    [[ -f "$FULLPATH" ]] || continue
+    [[ -x "$FULLPATH" ]] || continue
+
+    BIN_NAME=$(basename "$binpath")
+    MISSING_LIBS=""
+
+    # Method 1: readelf -d (works cross-arch, most reliable)
+    if command -v readelf &>/dev/null; then
+        NEEDED_LIBS=$(readelf -d "$FULLPATH" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
+        for lib in $NEEDED_LIBS; do
+            # Search for the library in rootfs
+            if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "$lib" 2>/dev/null | head -1 | grep -q .; then
+                MISSING_LIBS="$MISSING_LIBS $lib"
+            fi
+        done
+    fi
+
+    # Method 2: ldd with LD_LIBRARY_PATH (may fail for cross-arch, but worth trying)
+    if [[ -z "$MISSING_LIBS" ]] && command -v ldd &>/dev/null; then
+        LDD_OUT=$(LD_LIBRARY_PATH="$LIB_PATHS" ldd "$FULLPATH" 2>/dev/null || true)
+        if echo "$LDD_OUT" | grep -q "not found"; then
+            NOT_FOUND=$(echo "$LDD_OUT" | grep "not found" | awk '{print $1}' | tr '\n' ' ')
+            MISSING_LIBS="$MISSING_LIBS $NOT_FOUND"
+        fi
+    fi
+
+    if [[ -n "$MISSING_LIBS" ]]; then
+        fail "$BIN_NAME → missing libs:$MISSING_LIBS"
+        LDD_ERRORS=$((LDD_ERRORS + 1))
+    else
+        pass "$BIN_NAME → all deps satisfied"
+    fi
+done
+
+# Also check shared libs that other binaries depend on (libwlroots, libseat, etc.)
+echo ""
+echo "  Checking library-to-library dependencies..."
+CHECK_LIBS=(
+    "libwlroots"
+    "libseat"
+    "libwayland-server"
+    "libwayland-client"
+    "libEGL_mesa"
+    "libGLESv2_mesa"
+    "libgbm"
+)
+
+for libpat in "${CHECK_LIBS[@]}"; do
+    LIB_FILE=$(find "$ROOTFS/usr/lib" "$ROOTFS/lib" -name "${libpat}*" -type f 2>/dev/null | head -1)
+    [[ -z "$LIB_FILE" ]] && continue
+
+    LIB_BASENAME=$(basename "$LIB_FILE")
+    NEEDED_LIBS=$(readelf -d "$LIB_FILE" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
+    LIB_MISSING=""
+    for lib in $NEEDED_LIBS; do
+        if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "$lib" 2>/dev/null | head -1 | grep -q .; then
+            LIB_MISSING="$LIB_MISSING $lib"
+        fi
+    done
+
+    if [[ -n "$LIB_MISSING" ]]; then
+        fail "$LIB_BASENAME → missing deps:$LIB_MISSING"
+        LDD_ERRORS=$((LDD_ERRORS + 1))
+    else
+        pass "$LIB_BASENAME → all deps satisfied"
+    fi
+done
+
+if [[ $LDD_ERRORS -gt 0 ]]; then
+    echo ""
+    echo -e "  ${RED}Deep check found $LDD_ERRORS binaries/libs with missing dependencies!${NC}"
+    echo "  Install missing packages or fix library paths."
+fi
+
+# =========================================================================
+# 6. Kernel Modules — critical for live-boot
 # =========================================================================
 echo ""
 echo "── Kernel Modules (live-boot) ───────────────────────────"
@@ -242,7 +343,7 @@ else
 fi
 
 # =========================================================================
-# 6. User & Auth Setup
+# 7. User & Auth Setup
 # =========================================================================
 echo ""
 echo "── User & Auth Setup ────────────────────────────────────"
@@ -266,7 +367,7 @@ else
 fi
 
 # =========================================================================
-# 7. Auto-Login Configuration
+# 8. Auto-Login Configuration
 # =========================================================================
 echo ""
 echo "── Auto-Login Configuration ─────────────────────────────"
@@ -292,7 +393,7 @@ else
 fi
 
 # =========================================================================
-# 8. LabWC Auto-Start
+# 9. LabWC Auto-Start
 # =========================================================================
 echo ""
 echo "── LabWC Auto-Start ─────────────────────────────────────"
@@ -308,7 +409,7 @@ else
 fi
 
 # =========================================================================
-# 9. D-Bus & Seatd Services
+# 10. D-Bus & Seatd Services
 # =========================================================================
 echo ""
 echo "── OpenRC Services ──────────────────────────────────────"
@@ -347,7 +448,7 @@ for svc in "${REQUIRED_SERVICES[@]}"; do
 done
 
 # =========================================================================
-# 10. Profile & Environment
+# 11. Profile & Environment
 # =========================================================================
 echo ""
 echo "── Environment & Profiles ───────────────────────────────"
