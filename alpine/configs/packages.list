@@ -15,6 +15,7 @@ busybox-extras
 kmod
 
 # --- Kernel + Targeted Firmware ---
+linux-virt
 linux-lts
 linux-firmware-i915
 linux-firmware-amdgpu
