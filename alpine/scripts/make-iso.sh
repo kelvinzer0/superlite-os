@@ -271,10 +271,9 @@ CONSOLE 0
 DEFAULT superlite
 PROMPT 1
 TIMEOUT 50
-UI vesamenu.c32
 
+# Use simple text menu (vesamenu doesn't work over serial console)
 MENU TITLE SuperLite OS Boot Menu
-MENU BACKGROUND #00000000
 MENU COLOR title    * #FFFFFFFF *
 MENU COLOR sel      * #FFFFFFFF #FF0055AA *
 MENU COLOR unsel    * #FFBBBBBB #FF000000 *

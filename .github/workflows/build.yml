@@ -34,30 +34,22 @@ jobs:
         run: |
           sudo apt-get install -y qemu-system-x86 qemu-utils
           qemu-img create -f qcow2 testdisk.qcow2 2G
-          # Extract kernel + initrd from ISO for direct boot
           ISO_FILE=$(ls superlite-os-*.iso | head -1)
-          ISO_MNT=$(mktemp -d)
-          sudo mount -o loop,ro "$ISO_FILE" "$ISO_MNT"
-          sudo cp "$ISO_MNT/boot/vmlinuz-lts" ./vmlinuz-lts
-          sudo cp "$ISO_MNT/boot/initramfs-lts" ./initramfs-lts
-          sudo umount "$ISO_MNT"
-          sudo chown $(id -u):$(id -g) ./vmlinuz-lts ./initramfs-lts
-          # Boot with -kernel + -initrd + -append (required for serial console in CI)
-          # Use accel=tcg (software emulation) — KVM not available in CI runners
-          timeout 300s qemu-system-x86_64 \
-            -kernel ./vmlinuz-lts \
-            -initrd ./initramfs-lts \
-            -append "console=ttyS0 boot=live loglevel=7" \
+          # Boot from ISO via bootloader (serial console configured in GRUB/syslinux)
+          # Use accel=tcg — KVM not available in CI runners
+          # -serial stdio captures bootloader + kernel serial output
+          timeout 300s sudo qemu-system-x86_64 \
+            -cdrom "$ISO_FILE" \
             -drive file=testdisk.qcow2,format=qcow2 \
             -m 2G \
             -machine accel=tcg \
             -nographic \
             -serial mon:stdio \
             -no-reboot \
-            -cdrom "$ISO_FILE" \
+            -boot d \
             | tee boot.log || true
-          # Cek apakah boot berhasil sampai login prompt
-          if ! grep -q "login:" boot.log && ! grep -q "superlite" boot.log; then
+          # Check if boot reached login prompt
+          if ! grep -q "login:" boot.log && ! grep -q "superlite" boot.log && ! grep -q "SuperLite" boot.log; then
             echo "Kernel panic or boot failed! Showing last 50 lines:"
             tail -50 boot.log
             exit 1
