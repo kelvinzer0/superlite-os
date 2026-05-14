@@ -26,6 +26,9 @@ linux-firmware-other
 labwc
 foot
 mesa-dri-gallium
+mesa-egl
+mesa-gl
+mesa-gbm
 seatd
 dbus
 

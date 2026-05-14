@@ -95,6 +95,50 @@ fi
 
 echo "[setup] /sbin/init status: $(ls -la /sbin/init 2>/dev/null || echo 'MISSING')"
 
+# ── Ensure critical busybox applets exist ─────────────────────────────────────
+# Some applets (cttyhack, setsid, etc.) may not be compiled into Alpine's default
+# busybox. Install busybox-static as fallback which includes ALL applets.
+echo "[setup] Checking critical busybox applets..."
+MISSING_APPLETS=""
+for applet in cttyhack setsid switch_root mount umount modprobe mdev mountpoint blkid findmnt losetup; do
+    if ! busybox --list 2>/dev/null | grep -q "^${applet}$"; then
+        if ! command -v "$applet" >/dev/null 2>&1; then
+            MISSING_APPLETS="$MISSING_APPLETS $applet"
+        fi
+    fi
+done
+
+if [ -n "$MISSING_APPLETS" ]; then
+    echo "[setup] Missing busybox applets:$MISSING_APPLETS"
+    echo "[setup] Installing busybox-static for complete applet coverage..."
+    apk add busybox-static 2>/dev/null || true
+
+    # If busybox-static installed a separate binary, link missing applets
+    if [ -x /bin/busybox.static ]; then
+        for applet in $MISSING_APPLETS; do
+            if ! command -v "$applet" >/dev/null 2>&1; then
+                # Create wrapper that execs busybox.static with the applet name
+                cat > "/bin/$applet" << WRAPPER
+#!/bin/sh
+exec /bin/busybox.static $applet "\$@"
+WRAPPER
+                chmod +x "/bin/$applet"
+                echo "[setup] Created /bin/$applet wrapper (busybox.static)"
+            fi
+        done
+    fi
+fi
+
+# Final verification
+echo "[setup] Critical applet status:"
+for applet in cttyhack setsid switch_root; do
+    if command -v "$applet" >/dev/null 2>&1 || busybox "$applet" --help >/dev/null 2>&1; then
+        echo "[setup]   ✓ $applet"
+    else
+        echo "[setup]   ✗ $applet STILL MISSING — recovery shell may not work!"
+    fi
+done
+
 # ── mkinitfs configuration ───────────────────────────────────────────────────
 echo "[setup] Configuring mkinitfs..."
 mkdir -p /etc/mkinitfs
