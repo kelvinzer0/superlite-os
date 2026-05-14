@@ -283,6 +283,14 @@ log("Overlay OK")
 
 exec_silent("mount --bind /live/merged /live/merged")
 
+-- Create mountpoints that switch_root needs to move-mount into.
+-- squashfs is built with '-e proc sys dev run tmp' so these don't exist.
+mkdir_p("/live/merged/proc")
+mkdir_p("/live/merged/sys")
+mkdir_p("/live/merged/dev")
+mkdir_p("/live/merged/run")
+mkdir_p("/live/merged/tmp")
+
 -- Bind ISO media into merged root
 mkdir_p("/live/merged/media/iso")
 exec_silent("mount --bind " .. ISO_MOUNT .. " /live/merged/media/iso")
