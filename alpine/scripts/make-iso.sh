@@ -261,17 +261,17 @@ insmod gfxterm
 terminal_output gfxterm
 
 menuentry "SuperLite OS (Live)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 loglevel=4
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 edd=off loglevel=4
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Safe Mode)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 nomodeset loglevel=7
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 edd=off nomodeset loglevel=7
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Console)" {
-    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 3
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 edd=off 3
     initrd /boot/initramfs-lts
 }
 GRUBCFG
@@ -296,17 +296,17 @@ MENU COLOR border   * #FFFFFFFF #FF000000 *
 LABEL superlite
     MENU LABEL SuperLite OS (Live)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 loglevel=4
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 edd=off loglevel=4
 
 LABEL safe
     MENU LABEL SuperLite OS (Safe Mode)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 nomodeset loglevel=7
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 edd=off nomodeset loglevel=7
 
 LABEL console
     MENU LABEL SuperLite OS (Console)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 3
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 edd=off 3
 SYSLINUX
 
 # ── UEFI Boot (GRUB EFI binary) ──────────────────────────────────────────────
