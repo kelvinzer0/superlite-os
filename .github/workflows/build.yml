@@ -43,14 +43,14 @@ jobs:
           sudo umount "$ISO_MNT"
           sudo chown $(id -u):$(id -g) ./vmlinuz-lts ./initramfs-lts
           # Boot with -kernel + -initrd + -append (required for serial console in CI)
+          # Use accel=tcg (software emulation) — KVM not available in CI runners
           timeout 120s qemu-system-x86_64 \
             -kernel ./vmlinuz-lts \
             -initrd ./initramfs-lts \
             -append "console=ttyS0 boot=live loglevel=7" \
             -drive file=testdisk.qcow2,format=qcow2 \
             -m 2G \
-            -cpu host \
-            -machine accel=kvm \
+            -machine accel=tcg \
             -nographic \
             -serial mon:stdio \
             -cdrom "$ISO_FILE" \
