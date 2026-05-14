@@ -25,43 +25,60 @@ else
     ((ERRORS++))
 fi
 
-# Get file listing (try multiple methods)
-FILELIST=""
-if command -v isoinfo &>/dev/null; then
-    FILELIST=$(isoinfo -R -l -i "$ISO" 2>/dev/null || true)
-fi
-if [[ -z "$FILELIST" ]] && command -v xorriso &>/dev/null; then
-    FILELIST=$(xorriso -indev "$ISO" -ls / 2>/dev/null || true)
-fi
+# ── Check for specific boot files ─────────────────────────────────────────────
+# Use multiple methods to verify file presence in the ISO
 
-# Check for EFI boot
-if echo "$FILELIST" | grep -qiE "(EFI|BOOTX64|efi\.img)"; then
-    echo "  ✓ EFI boot present"
-elif [[ -n "$FILELIST" ]]; then
-    # Fallback: check if EFI dir exists in ISO
-    echo "  ⚠ EFI boot not detected in file listing"
-else
-    # Can't verify but don't fail — xorriso args in build.sh include EFI
-    echo "  ⚠ Cannot verify EFI (isoinfo/xorriso not available on host)"
-fi
+check_iso_file() {
+    local pattern="$1"
+    local label="$2"
 
-# Check for syslinux boot
-if echo "$FILELIST" | grep -qiE "(isolinux|syslinux)"; then
-    echo "  ✓ Legacy BIOS boot present"
-elif [[ -n "$FILELIST" ]]; then
-    echo "  ⚠ syslinux not detected in file listing"
-else
-    echo "  ⚠ Cannot verify syslinux (isoinfo/xorriso not available on host)"
-fi
+    # Method 1: xorriso find (most reliable)
+    if command -v xorriso &>/dev/null; then
+        if xorriso -indev "$ISO" -find / -maxdepth 4 2>/dev/null | grep -qiE "$pattern"; then
+            echo "  ✓ $label"
+            return 0
+        fi
+    fi
 
-# Check for squashfs
-if echo "$FILELIST" | grep -qiE "(rootfs\.squashfs|\.sfs)"; then
-    echo "  ✓ Squashfs rootfs present"
-elif [[ -n "$FILELIST" ]]; then
-    echo "  ⚠ Squashfs not detected in file listing"
-else
-    echo "  ⚠ Cannot verify squashfs (isoinfo/xorriso not available on host)"
-fi
+    # Method 2: isoinfo recursive-ish check
+    if command -v isoinfo &>/dev/null; then
+        # Try listing specific directories
+        for dir in "/" "/boot" "/boot/syslinux" "/EFI" "/EFI/BOOT" "/live"; do
+            if isoinfo -R -l -i "$ISO" -path-list "$dir" 2>/dev/null | grep -qiE "$pattern"; then
+                echo "  ✓ $label"
+                return 0
+            fi
+        done
+        # Also try full listing
+        if isoinfo -l -i "$ISO" 2>/dev/null | grep -qiE "$pattern"; then
+            echo "  ✓ $label"
+            return 0
+        fi
+    fi
+
+    # Method 3: 7z (if available)
+    if command -v 7z &>/dev/null; then
+        if 7z l "$ISO" 2>/dev/null | grep -qiE "$pattern"; then
+            echo "  ✓ $label"
+            return 0
+        fi
+    fi
+
+    # Method 4: bsdtar (if available)
+    if command -v bsdtar &>/dev/null; then
+        if bsdtar -tf "$ISO" 2>/dev/null | grep -qiE "$pattern"; then
+            echo "  ✓ $label"
+            return 0
+        fi
+    fi
+
+    echo "  ⚠ $label not detected"
+    return 1
+}
+
+check_iso_file "EFI|BOOTX64|efi\.img" "EFI boot"
+check_iso_file "isolinux|syslinux|isolinux\.bin" "Legacy BIOS boot (syslinux)"
+check_iso_file "rootfs\.squashfs|\.sfs" "Squashfs rootfs"
 
 # Summary
 echo ""
