@@ -32,7 +32,7 @@ jobs:
 
       - name: Test ISO with QEMU
         run: |
-          sudo apt-get install -y qemu-system-x86_64 qemu-utils
+          sudo apt-get install -y qemu-system-x86 qemu-utils
           qemu-img create -f qcow2 testdisk.qcow2 2G
           timeout 60s qemu-system-x86_64 \
             -cdrom superlite-os-*.iso \
