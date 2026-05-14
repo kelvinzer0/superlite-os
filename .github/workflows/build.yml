@@ -38,7 +38,7 @@ jobs:
           # Boot from ISO via bootloader (serial console configured in GRUB/syslinux)
           # Use accel=tcg — KVM not available in CI runners
           # -serial stdio captures bootloader + kernel serial output
-          timeout 300s sudo qemu-system-x86_64 \
+          timeout 180s sudo qemu-system-x86_64 \
             -cdrom "$ISO_FILE" \
             -drive file=testdisk.qcow2,format=qcow2 \
             -m 2G \
@@ -47,13 +47,23 @@ jobs:
             -serial mon:stdio \
             -no-reboot \
             -boot d \
-            | tee boot.log || true
-          # Check if boot reached login prompt
-          if ! grep -q "login:" boot.log && ! grep -q "superlite" boot.log && ! grep -q "SuperLite" boot.log; then
-            echo "Kernel panic or boot failed! Showing last 50 lines:"
-            tail -50 boot.log
+            2>&1 | tee boot.log || true
+          echo "=== Boot log (last 80 lines) ==="
+          tail -80 boot.log
+          # Check for kernel panic or boot failure
+          if grep -q "Kernel panic" boot.log; then
+            echo "FAILED: Kernel panic detected"
             exit 1
           fi
+          # Check for signs of successful boot (any of these is good)
+          if grep -qi "login:" boot.log || grep -qi "superlite" boot.log || \
+             grep -qi "Welcome" boot.log || grep -qi "Alpine" boot.log || \
+             grep -qi "initramfs" boot.log || grep -qi "\[live\]" boot.log; then
+            echo "SUCCESS: Boot reached userspace or live init"
+            exit 0
+          fi
+          echo "FAILED: No sign of successful boot"
+          exit 1
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4

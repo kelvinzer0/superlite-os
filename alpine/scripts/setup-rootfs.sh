@@ -167,6 +167,16 @@ TERM="foot"
 GETTY_ARGS="--autologin root --noclear"
 EOF
 
+# ── Auto-login on serial console (ttyS0) for CI/QEMU/headless ──────────────
+cat > /etc/conf.d/agetty.ttyS0 << 'EOF'
+BAUDRATE="115200"
+TERM="linux"
+GETTY_ARGS="--autologin root --noclear"
+EOF
+
+ln -sf /etc/init.d/agetty /etc/init.d/agetty.ttyS0 2>/dev/null || true
+rc-update add agetty.ttyS0 default 2>/dev/null || true
+
 # ── Create live user ─────────────────────────────────────────────────────────
 echo "[setup] Creating live user..."
 adduser -D -s /bin/bash -G wheel live
