@@ -288,6 +288,8 @@ exec_silent("mount --bind /live/merged /live/merged")
 mkdir_p("/live/merged/proc")
 mkdir_p("/live/merged/sys")
 mkdir_p("/live/merged/dev")
+mkdir_p("/live/merged/dev/pts")
+mkdir_p("/live/merged/dev/shm")
 mkdir_p("/live/merged/run")
 mkdir_p("/live/merged/tmp")
 

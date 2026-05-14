@@ -339,9 +339,9 @@ fi
 # ── Step 9: Clean up and switch root ─────────────────────────────────────────
 LIVE_LOG "Switching to live root..."
 
-# Unmount proc/sys/dev before switch_root
-umount /proc 2>/dev/null || true
-umount /sys  2>/dev/null || true
+# Create mountpoints that switch_root needs to move-mount into.
+# squashfs is built with '-e proc sys dev run tmp' so these don't exist.
+mkdir -p /live/merged/proc /live/merged/sys /live/merged/dev /live/merged/dev/pts /live/merged/dev/shm /live/merged/run /live/merged/tmp
 
 # Verify /sbin/init exists in merged root
 INIT_PATH="/live/merged/sbin/init"
@@ -353,4 +353,6 @@ if [ ! -e "$INIT_PATH" ]; then
 fi
 
 # switch_root: pivot to the live system
+# DO NOT unmount /proc /sys — switch_root mount-moves them to the new root.
+# OpenRC needs these filesystems to be present when it starts.
 exec switch_root /live/merged /sbin/init "$@"
