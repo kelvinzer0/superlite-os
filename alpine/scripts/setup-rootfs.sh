@@ -105,8 +105,8 @@ fi
 # Install the live-boot hook into mkinitfs features
 mkdir -p /etc/mkinitfs/features.d
 if [ -f /tmp/hooks/live-boot ]; then
-    cp /tmp/hooks/live-boot /etc/mkinitfs/features.d/superlite-live.init
-    chmod +x /etc/mkinitfs/features.d/superlite-live.init
+    cp /tmp/hooks/live-boot /etc/mkinitfs/features.d/superlite-live
+    chmod +x /etc/mkinitfs/features.d/superlite-live
 fi
 
 # Install the live init script for use by initramfs

@@ -114,18 +114,23 @@ if [[ "$INITRAMFS_OK" != true ]]; then
     # Copy busybox from rootfs for initramfs utilities
     if [[ -f "${ROOTFS}/bin/busybox" ]]; then
         cp "${ROOTFS}/bin/busybox" "$INITRAMFS_DIR/bin/busybox"
-        # Create symlinks for common utilities
-        for util in sh mount umount modprobe sleep mkdir ls cat switch_root mountpoint; do
+        # Create symlinks for common utilities (expanded for live-boot)
+        for util in sh mount umount modprobe sleep mkdir ls cat switch_root \
+                    mountpoint mdev setsid cttyhack blkid findmnt \
+                    find grep sed awk head tail wc tr cut; do
             ln -sf /bin/busybox "$INITRAMFS_DIR/bin/$util" 2>/dev/null || true
         done
     fi
 
-    # Copy the live-boot init
+    # Copy the live-boot init (as /init — kernel's default entry point)
     if [[ -f "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" ]]; then
         cp "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" "$INITRAMFS_DIR/init"
         cp "${SCRIPT_DIR}/alpine/hooks/superlite-live.init" "$INITRAMFS_DIR/sbin/init"
         chmod +x "$INITRAMFS_DIR/init" "$INITRAMFS_DIR/sbin/init"
     fi
+
+    # Create essential device nodes and directories for emergency shell
+    mkdir -p "$INITRAMFS_DIR"/dev/pts "$INITRAMFS_DIR"/dev/shm "$INITRAMFS_DIR"/proc "$INITRAMFS_DIR"/sys
 
     # Copy kernel modules (essential ones only)
     KVER=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "lts")

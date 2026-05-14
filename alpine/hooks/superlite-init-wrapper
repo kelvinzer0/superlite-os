@@ -9,6 +9,9 @@
 # or openrc. This wrapper ensures proper boot regardless of boot method.
 # ============================================================================
 
+# Set PATH for init environment
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 # If we have openrc-init, use it (preferred for Alpine)
 if [ -x /sbin/openrc-init ]; then
     exec /sbin/openrc-init "$@"
@@ -24,10 +27,19 @@ if [ -x /sbin/openrc ]; then
     exec /sbin/openrc "$@"
 fi
 
-# Last resort: emergency shell
+# Last resort: emergency shell with proper TTY
 echo "[init] ERROR: No init system found!"
 echo "[init] Available in /sbin/:"
 ls -la /sbin/ 2>/dev/null
 echo ""
+echo "[init] Available in /bin/:"
+ls -la /bin/ 2>/dev/null
+echo ""
 echo "[init] Dropping to emergency shell..."
+
+# Try to get a usable shell with job control
+if [ -c /dev/console ]; then
+    exec setsid cttyhack /bin/sh 2>/dev/null \
+        || exec setsid /bin/sh </dev/console >/dev/console 2>&1
+fi
 exec /bin/sh
