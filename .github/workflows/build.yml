@@ -34,15 +34,25 @@ jobs:
         run: |
           sudo apt-get install -y qemu-system-x86 qemu-utils
           qemu-img create -f qcow2 testdisk.qcow2 2G
-          timeout 60s qemu-system-x86_64 \
-            -cdrom superlite-os-*.iso \
+          # Extract kernel + initrd from ISO for direct boot
+          ISO_FILE=$(ls superlite-os-*.iso | head -1)
+          ISO_MNT=$(mktemp -d)
+          sudo mount -o loop,ro "$ISO_FILE" "$ISO_MNT"
+          cp "$ISO_MNT/boot/vmlinuz-lts" ./vmlinuz-lts
+          cp "$ISO_MNT/boot/initramfs-lts" ./initramfs-lts
+          sudo umount "$ISO_MNT"
+          # Boot with -kernel + -initrd + -append (required for serial console in CI)
+          timeout 120s qemu-system-x86_64 \
+            -kernel ./vmlinuz-lts \
+            -initrd ./initramfs-lts \
+            -append "console=ttyS0 boot=live quiet splash loglevel=3" \
             -drive file=testdisk.qcow2,format=qcow2 \
             -m 2G \
             -cpu host \
             -machine accel=kvm \
             -nographic \
             -serial mon:stdio \
-            -append "console=ttyS0 quiet" \
+            -cdrom "$ISO_FILE" \
             | tee boot.log || true
           # Cek apakah boot berhasil sampai login prompt
           if ! grep -q "login:" boot.log && ! grep -q "superlite" boot.log; then

@@ -247,17 +247,17 @@ insmod gfxterm
 terminal_output gfxterm
 
 menuentry "SuperLite OS (Live)" {
-    linux /boot/vmlinuz-lts boot=live quiet splash loglevel=3
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 quiet splash loglevel=3
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Safe Mode)" {
-    linux /boot/vmlinuz-lts boot=live nomodeset verbose
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 nomodeset verbose
     initrd /boot/initramfs-lts
 }
 
 menuentry "SuperLite OS (Live — Console)" {
-    linux /boot/vmlinuz-lts boot=live 3
+    linux /boot/vmlinuz-lts boot=live console=ttyS0,115200 console=tty0 3
     initrd /boot/initramfs-lts
 }
 GRUBCFG
@@ -265,6 +265,9 @@ GRUBCFG
 # ── Syslinux config (Legacy BIOS) ────────────────────────────────────────────
 log "Writing syslinux config..."
 cat > "${ISO_DIR}/boot/syslinux/isolinux.cfg" << 'SYSLINUX'
+SERIAL 0 115200
+CONSOLE 0
+
 DEFAULT superlite
 PROMPT 1
 TIMEOUT 50
@@ -280,17 +283,17 @@ MENU COLOR border   * #FFFFFFFF #FF000000 *
 LABEL superlite
     MENU LABEL SuperLite OS (Live)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live quiet splash
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 quiet splash
 
 LABEL safe
     MENU LABEL SuperLite OS (Safe Mode)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live nomodeset verbose
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 nomodeset verbose
 
 LABEL console
     MENU LABEL SuperLite OS (Console)
     LINUX /boot/vmlinuz-lts
-    APPEND initrd=/boot/initramfs-lts boot=live 3
+    APPEND initrd=/boot/initramfs-lts boot=live console=ttyS0,115200 console=tty0 3
 SYSLINUX
 
 # ── UEFI Boot (GRUB EFI binary) ──────────────────────────────────────────────
