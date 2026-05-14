@@ -11,6 +11,7 @@ openrc
 busybox
 busybox-suid
 busybox-static
+busybox-extras
 kmod
 
 # --- Kernel + Targeted Firmware ---
