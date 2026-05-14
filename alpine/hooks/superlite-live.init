@@ -336,12 +336,20 @@ if mountpoint -q "$ISO_MOUNT"; then
     mount --bind "$ISO_MOUNT" /live/merged/media/iso 2>/dev/null || true
 fi
 
+# Mount devpts and tmpfs on /dev BEFORE switch_root.
+# switch_root does 'mount --move /dev → /live/merged/dev', which replaces
+# any directories we create under /live/merged/dev. So we must mount on
+# /dev in the initramfs, and they'll move along with the /dev mount.
+mkdir -p /dev/pts /dev/shm
+mount -t devpts devpts /dev/pts 2>/dev/null || true
+mount -t tmpfs tmpfs /dev/shm 2>/dev/null || true
+
 # ── Step 9: Clean up and switch root ─────────────────────────────────────────
 LIVE_LOG "Switching to live root..."
 
 # Create mountpoints that switch_root needs to move-mount into.
 # squashfs is built with '-e proc sys dev run tmp' so these don't exist.
-mkdir -p /live/merged/proc /live/merged/sys /live/merged/dev /live/merged/dev/pts /live/merged/dev/shm /live/merged/run /live/merged/tmp
+mkdir -p /live/merged/proc /live/merged/sys /live/merged/run /live/merged/tmp
 
 # Verify /sbin/init exists in merged root
 INIT_PATH="/live/merged/sbin/init"

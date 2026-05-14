@@ -287,11 +287,17 @@ exec_silent("mount --bind /live/merged /live/merged")
 -- squashfs is built with '-e proc sys dev run tmp' so these don't exist.
 mkdir_p("/live/merged/proc")
 mkdir_p("/live/merged/sys")
-mkdir_p("/live/merged/dev")
-mkdir_p("/live/merged/dev/pts")
-mkdir_p("/live/merged/dev/shm")
 mkdir_p("/live/merged/run")
 mkdir_p("/live/merged/tmp")
+
+-- Mount devpts and tmpfs on /dev BEFORE switch_root.
+-- switch_root does 'mount --move /dev → /live/merged/dev', which replaces
+-- any directories we create under /live/merged/dev. So we must mount on
+-- /dev in the initramfs, and they'll move along with the /dev mount.
+mkdir_p("/dev/pts")
+mkdir_p("/dev/shm")
+exec_silent("mount -t devpts devpts /dev/pts")
+exec_silent("mount -t tmpfs tmpfs /dev/shm")
 
 -- Bind ISO media into merged root
 mkdir_p("/live/merged/media/iso")
