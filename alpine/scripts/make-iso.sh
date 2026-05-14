@@ -129,6 +129,21 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
                 done
             fi
 
+            # ── Force-copy entire kernel modules directory into initramfs ──
+            # mkinitfs may not include /lib/modules/ if feature files are incomplete.
+            # This ensures modprobe works at boot time for ALL modules.
+            KVER_ROOT=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "")
+            if [[ -n "$KVER_ROOT" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER_ROOT" ]]; then
+                if [[ ! -d "$IRD_DIR/lib/modules/$KVER_ROOT" ]] || \
+                   [[ -z "$(ls -A "$IRD_DIR/lib/modules/$KVER_ROOT" 2>/dev/null)" ]]; then
+                    log "Kernel modules missing in initramfs — force-copying from rootfs..."
+                    mkdir -p "$IRD_DIR/lib/modules/$KVER_ROOT"
+                    cp -a "${ROOTFS}/lib/modules/$KVER_ROOT/." "$IRD_DIR/lib/modules/$KVER_ROOT/" 2>/dev/null || true
+                    MODULE_COUNT=$(find "$IRD_DIR/lib/modules/$KVER_ROOT" -name "*.ko*" 2>/dev/null | wc -l)
+                    log "Copied $MODULE_COUNT kernel modules to initramfs"
+                fi
+            fi
+
             # ── Verify critical modules are in initrd ──
             # All these must be present for live-boot to work
             KVER_IRD=$(ls "$IRD_DIR/lib/modules/" 2>/dev/null | head -1 || echo "")

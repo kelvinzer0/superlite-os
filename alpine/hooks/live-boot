@@ -32,17 +32,22 @@ if [ -f /tmp/hooks/superlite-live.init ]; then
 fi
 
 # Include required binaries in initramfs
-for bin in switch_root mount umount modprobe sleep mkdir ls cat mountpoint \
+# PRIORITY: Always prefer Alpine rootfs binaries over host (Ubuntu) binaries.
+# Host modprobe/kmod may not work with Alpine's module format.
+for bin in switch_root mount umount modprobe insmod depmod sleep mkdir ls cat mountpoint \
            setsid cttyhack mdev udevd udevadm blkid findmnt; do
-    binpath=$(command -v "$bin" 2>/dev/null)
-    # Fallback: cari di rootfs Alpine (untuk cttyhack yang tidak ada di host Ubuntu)
+    binpath=""
+    # First: try Alpine rootfs (most reliable for module loading)
+    for rootfs_path in \
+        "${ROOTFS:-/}/sbin/$bin" \
+        "${ROOTFS:-/}/bin/$bin" \
+        "${ROOTFS:-/}/usr/sbin/$bin" \
+        "${ROOTFS:-/}/usr/bin/$bin"; do
+        [ -f "$rootfs_path" ] && binpath="$rootfs_path" && break
+    done
+    # Fallback: host system (for tools not in rootfs)
     if [ -z "$binpath" ]; then
-        for rootfs_path in \
-            "${ROOTFS:-/}/bin/$bin" \
-            "${ROOTFS:-/}/usr/bin/$bin" \
-            "${ROOTFS:-/}/sbin/$bin"; do
-            [ -f "$rootfs_path" ] && binpath="$rootfs_path" && break
-        done
+        binpath=$(command -v "$bin" 2>/dev/null)
     fi
     if [ -n "$binpath" ] && [ -f "$binpath" ]; then
         install -D -m 0755 "$binpath" "${DESTDIR:-/}/bin/$bin" 2>/dev/null || true
