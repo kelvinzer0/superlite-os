@@ -320,7 +320,7 @@ if [[ -n "$KVER" ]]; then
         "ext4"          # ext4 filesystem
         "vfat"          # FAT filesystem
         "nls_cp437"     # Codepage for FAT
-        "nls_iso8859_1" # ISO charset for FAT
+        "cdrom"         # CD-ROM support (isofs dependency)
     )
 
     for mod in "${CRITICAL_MODULES[@]}"; do

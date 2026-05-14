@@ -131,26 +131,44 @@ _superlite_find_media() {
         mdev -s 2>/dev/null || true
     fi
 
-    # Load ALL storage & filesystem modules — log each one explicitly
+    # Load ALL storage & filesystem modules in dependency order
+    # ORDER MATTERS: isofs depends on cdrom, sr_mod depends on scsi_mod+cdrom
     echo "[live] Loading storage modules..."
     _mod_loaded=0
     _mod_failed=0
     for _mod in \
-        scsi_mod cdrom sr_mod \
+        scsi_mod usb_common usbcore \
+        cdrom \
+        sr_mod sd_mod mmc_block \
         loop isofs squashfs \
-        usb-storage sd_mod mmc_block \
+        usb-storage \
         nvme nvme_core \
-        vfat fat msdos ext4 \
+        fat vfat msdos \
+        ext4 jbd2 crc16 \
         xhci_hcd ehci_hcd ohci_hcd uhci_hcd \
-        nls_cp437 nls_iso8859_1 nls_ascii \
-        usb_common; do
-        if modprobe "$_mod" 2>/dev/null; then
+        nls_cp437 nls_iso8859_1 nls_ascii; do
+        _modprobe_out=$(modprobe "$_mod" 2>&1)
+        _modprobe_ret=$?
+        if [ $_modprobe_ret -eq 0 ]; then
             _mod_loaded=$(( _mod_loaded + 1 ))
         else
             _mod_failed=$(( _mod_failed + 1 ))
+            # Log actual error for debugging (not just silent skip)
+            if [ -n "$_modprobe_out" ]; then
+                echo "[live]   modprobe $_mod failed: $_modprobe_out"
+            fi
         fi
     done
     echo "[live] Modules: ${_mod_loaded} loaded, ${_mod_failed} skipped/missing"
+
+    # Verify critical modules are actually loaded
+    for _mod in isofs cdrom sr_mod; do
+        if cat /proc/modules 2>/dev/null | grep -q "^${_mod} "; then
+            echo "[live]   ✓ $_mod: loaded"
+        else
+            echo "[live]   ✗ $_mod: NOT loaded!"
+        fi
+    done
 
     # Give SCSI/IDE/USB controllers time to register devices
     # QEMU virtio is fast, but real hardware needs more time
@@ -188,15 +206,35 @@ _superlite_find_media() {
     done
 
     # Check if isofs module is actually loaded (critical for CD-ROM mount)
-    if ! cat /proc/modules 2>/dev/null | grep -q isofs; then
+    if ! cat /proc/modules 2>/dev/null | grep -q "^isofs "; then
         echo "[live] WARNING: isofs module NOT loaded — CD-ROM mount will fail!"
-        echo "[live] Trying insmod fallback..."
-        _isofs_ko=$(find /lib/modules -name "isofs.ko*" 2>/dev/null | head -1)
-        if [ -n "$_isofs_ko" ]; then
-            insmod "$_isofs_ko" 2>/dev/null && echo "[live]   insmod isofs: OK" || echo "[live]   insmod isofs: FAILED"
-        else
-            echo "[live]   isofs.ko not found in /lib/modules!"
-        fi
+        echo "[live] Trying insmod fallback with dependency chain..."
+        # isofs depends on cdrom module — load in order
+        _insmod_deps="cdrom isofs"
+        for _mod in $_insmod_deps; do
+            if cat /proc/modules 2>/dev/null | grep -q "^${_mod} "; then
+                echo "[live]   $_mod: already loaded"
+                continue
+            fi
+            _ko_file=$(find /lib/modules -name "${_mod}.ko*" 2>/dev/null | head -1)
+            if [ -z "$_ko_file" ]; then
+                echo "[live]   $_mod: .ko file not found!"
+                continue
+            fi
+            # Decompress if needed (modprobe handles this, insmod doesn't)
+            case "$_ko_file" in
+                *.xz)   xz -d < "$_ko_file" > /tmp/${_mod}.ko 2>/dev/null && _ko_file="/tmp/${_mod}.ko" ;;
+                *.gz)   gzip -d < "$_ko_file" > /tmp/${_mod}.ko 2>/dev/null && _ko_file="/tmp/${_mod}.ko" ;;
+                *.zst)  zstd -d < "$_ko_file" > /tmp/${_mod}.ko 2>/dev/null && _ko_file="/tmp/${_mod}.ko" ;;
+            esac
+            _insmod_out=$(insmod "$_ko_file" 2>&1)
+            if [ $? -eq 0 ]; then
+                echo "[live]   insmod $_mod: OK"
+            else
+                echo "[live]   insmod $_mod: FAILED — $_insmod_out"
+            fi
+            rm -f /tmp/${_mod}.ko
+        done
     else
         echo "[live] isofs module: loaded"
     fi
