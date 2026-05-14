@@ -196,6 +196,12 @@ configure_rootfs() {
         cp "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" "${ROOTFS_DIR}/tmp/hooks/"
     fi
 
+    # Copy init patcher script (patches Alpine's init for live-boot support)
+    if [[ -f "${SCRIPT_DIR}/alpine/scripts/patch-init.sh" ]]; then
+        cp "${SCRIPT_DIR}/alpine/scripts/patch-init.sh" "${ROOTFS_DIR}/tmp/hooks/"
+        chmod +x "${ROOTFS_DIR}/tmp/hooks/patch-init.sh"
+    fi
+
     # Run setup inside chroot
     log_info "Running setup-rootfs.sh inside chroot (this may take a while)..."
     chroot "${ROOTFS_DIR}" /bin/sh /tmp/setup-rootfs.sh \

@@ -117,6 +117,14 @@ fi
 
 # Regenerate initramfs with live-boot support
 echo "[setup] Regenerating initramfs..."
+
+# First, patch Alpine's init script for live-boot support
+if [ -f /tmp/hooks/patch-init.sh ]; then
+    echo "[setup] Patching Alpine init for live-boot..."
+    chmod +x /tmp/hooks/patch-init.sh
+    sh /tmp/hooks/patch-init.sh 2>&1 || echo "[setup] WARNING: init patch had issues (non-fatal)"
+fi
+
 KVER=$(ls /lib/modules/ 2>/dev/null | head -1 || echo "lts")
 if [ -n "$KVER" ] && [ -d "/lib/modules/$KVER" ]; then
     mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -3 || \
