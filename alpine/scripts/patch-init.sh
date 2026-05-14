@@ -103,47 +103,76 @@ _superlite_find_media() {
     fi
 
     # Load all storage & filesystem modules (some may already be loaded)
+    echo "[live] Loading storage modules..."
     for mod in \
+        scsi_mod cdrom sr_mod \
         loop isofs \
-        usb-storage sd_mod sr_mod mmc_block \
+        usb-storage sd_mod mmc_block \
         nvme vfat fat msdos ext4 \
         xhci_hcd ehci_hcd ohci_hcd uhci_hcd \
         nls_cp437 nls_iso8859_1 nls_ascii \
-        scsi_mod usb_common cdrom; do
-        modprobe "$mod" 2>/dev/null || true
+        usb_common; do
+        modprobe "$mod" 2>/dev/null && echo "[live]   loaded: $mod" || true
     done
+
+    # Give SCSI/IDE controllers time to register devices
+    echo "[live] Waiting for storage controllers..."
+    sleep 3
+
+    # Re-run mdev to pick up newly registered devices
+    mdev -s 2>/dev/null || true
+
+    # If /dev/sr0 still doesn't exist, create it manually (major 11, minor 0)
+    if [ ! -b /dev/sr0 ]; then
+        echo "[live] /dev/sr0 not found — creating manually (11,0)"
+        mknod -m 660 /dev/sr0 b 11 0 2>/dev/null || true
+    fi
 
     # Wait for USB/storage controllers to enumerate devices
     _wait=0
-    while [ $_wait -lt 8 ]; do
+    while [ $_wait -lt 10 ]; do
         if ls /dev/sd*[0-9] /dev/sr[0-9] /dev/mmcblk*p[0-9] /dev/nvme*n*p[0-9] /dev/vd*[0-9] 2>/dev/null | head -1 >/dev/null; then
+            echo "[live] Block devices detected after ${_wait}s"
             break
         fi
         mdev -s 2>/dev/null || true
         sleep 1
         _wait=$(( _wait + 1 ))
     done
-    [ $_wait -gt 0 ] && echo "[live] Waited ${_wait}s for devices"
 
-    # Re-scan after modules loaded + devices settled
+    # Final mdev scan
     mdev -s 2>/dev/null || true
+
+    # Debug: show what block devices exist
+    echo "[live] Available block devices:"
+    ls -la /dev/sr* /dev/cdrom /dev/sd* /dev/vd* /dev/mmcblk* /dev/nvme* 2>/dev/null || echo "[live]   (none found)"
 
     _live_found=no
     _live_mount="/mnt/boot-media"
     mkdir -p "$_live_mount"
 
     # Try CD-ROM devices first (most common for ISO boot)
+    echo "[live] Scanning for CD-ROM..."
     for _dev in /dev/sr0 /dev/cdrom /dev/sr1; do
         [ -b "$_dev" ] || continue
-        if mount -t iso9660 -o ro "$_dev" "$_live_mount" 2>/dev/null; then
-            if [ -f "$_live_mount/live/rootfs.squashfs" ] || \
-               [ -d "$_live_mount/live" ]; then
-                echo "[live] Found live media on $_dev (iso9660)"
-                _live_found=yes
+        echo "[live]   Trying $_dev..."
+        # Retry mount up to 3 times (device may need time to initialize)
+        _mount_try=0
+        while [ $_mount_try -lt 3 ]; do
+            if mount -t iso9660 -o ro "$_dev" "$_live_mount" 2>/dev/null; then
+                if [ -f "$_live_mount/live/rootfs.squashfs" ] || \
+                   [ -d "$_live_mount/live" ]; then
+                    echo "[live] Found live media on $_dev (iso9660)"
+                    _live_found=yes
+                    break 2
+                fi
+                echo "[live]   Mounted $_dev but no live media found"
+                umount "$_live_mount" 2>/dev/null
                 break
             fi
-            umount "$_live_mount" 2>/dev/null
-        fi
+            _mount_try=$(( _mount_try + 1 ))
+            [ $_mount_try -lt 3 ] && sleep 2
+        done
     done
 
     # Then try partitions (for dd'd ISOs on USB, the raw device is iso9660)
