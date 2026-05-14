@@ -81,20 +81,26 @@ CRITICAL_APPLETS=(
 )
 
 BUSYBOX_BIN="$ROOTFS/bin/busybox"
-if [[ -x "$BUSYBOX_BIN" ]]; then
+BUSYBOX_STATIC="$ROOTFS/bin/busybox.static"
+if [[ -x "$BUSYBOX_BIN" ]] || [[ -x "$BUSYBOX_STATIC" ]]; then
     pass "busybox binary exists"
 
-    # Get busybox applet list (handle different output formats)
+    # Get busybox applet list — check both regular and static builds
     BB_LIST=$("$BUSYBOX_BIN" --list 2>/dev/null || true)
+    BB_STATIC_LIST=$("$BUSYBOX_STATIC" --list 2>/dev/null || true)
 
     for applet in "${CRITICAL_APPLETS[@]}"; do
-        # Check if applet is available via busybox (exact match or prefix)
+        # Check regular busybox, then static, then standalone binary, then runtime
         if echo "$BB_LIST" | grep -q "^${applet}$"; then
             pass "busybox applet: $applet"
+        elif echo "$BB_STATIC_LIST" | grep -q "^${applet}$"; then
+            pass "busybox applet: $applet (via busybox.static)"
         elif [[ -x "$ROOTFS/bin/$applet" ]] || [[ -x "$ROOTFS/sbin/$applet" ]]; then
             pass "standalone: $applet"
         elif "$BUSYBOX_BIN" "$applet" --help &>/dev/null 2>&1; then
             pass "busybox applet (runtime): $applet"
+        elif [[ -x "$BUSYBOX_STATIC" ]] && "$BUSYBOX_STATIC" "$applet" --help &>/dev/null 2>&1; then
+            pass "busybox applet (busybox.static): $applet"
         else
             # These are MOST critical — others are warn
             if [[ "$applet" == "cttyhack" || "$applet" == "switch_root" ]]; then
@@ -184,19 +190,24 @@ for libname in "${WAYLAND_LIBS[@]}"; do
 done
 
 for libname in "${MESA_LIBS[@]}"; do
-    # These use Alpine versioned naming: libwlroots-0.18.so.0, libEGL_mesa.so.0, etc.
-    FOUND=$(find "$ROOTFS/usr/lib" -name "${libname}*" -type f 2>/dev/null | head -1)
-    FOUND_LINK=$(find "$ROOTFS/usr/lib" -name "${libname}*" -type l 2>/dev/null | head -1)
-    if [[ -n "$FOUND" || -n "$FOUND_LINK" ]]; then
-        pass "$libname ($(basename "${FOUND:-$FOUND_LINK}"))"
+    # Alpine uses versioned .so files — search all lib paths + symlinks
+    FOUND=$(find "$ROOTFS/usr/lib" "$ROOTFS/lib" -name "${libname}*" \( -type f -o -type l \) 2>/dev/null | head -1)
+    if [[ -n "$FOUND" ]]; then
+        pass "$libname ($(basename "$FOUND"))"
     else
-        FOUND=$(find "$ROOTFS/lib" -name "${libname}*" 2>/dev/null | head -1)
-        if [[ -n "$FOUND" ]]; then
-            pass "$libname ($(basename "$FOUND"))"
-        else
-            # Also check if it's a static lib or provided by a different package
-            warn "$libname not found (may be in sub-package or not needed)"
-        fi
+        # Mesa on Alpine may use alternative naming (libEGL.so, libGLESv2.so, etc.)
+        case "$libname" in
+            libEGL_mesa)
+                ALT=$(find "$ROOTFS/usr/lib" "$ROOTFS/lib" -name "libEGL*" \( -type f -o -type l \) 2>/dev/null | head -1)
+                if [[ -n "$ALT" ]]; then pass "$libname (via $(basename "$ALT"))"; continue; fi
+                ;;
+            libGLESv2_mesa)
+                ALT=$(find "$ROOTFS/usr/lib" "$ROOTFS/lib" -name "libGLESv2*" \( -type f -o -type l \) 2>/dev/null | head -1)
+                if [[ -n "$ALT" ]]; then pass "$libname (via $(basename "$ALT"))"; continue; fi
+                ;;
+        esac
+        # Non-critical: may be provided by mesa-egl or mesa-gl under different names
+        warn "$libname not found (Alpine may use alternative naming)"
     fi
 done
 

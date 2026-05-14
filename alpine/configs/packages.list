@@ -10,6 +10,7 @@ alpine-base
 openrc
 busybox
 busybox-suid
+busybox-static
 
 # --- Kernel + Targeted Firmware ---
 linux-lts

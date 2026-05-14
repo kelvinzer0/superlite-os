@@ -213,13 +213,25 @@ in_boot && /^ebegin "Mounting boot media"/ {
     next
 }
 in_boot && /nlplug-findfs/ {
-    # Print the nlplug-findfs command but capture return code
-    print
-    # Skip continuation lines of the nlplug-findfs command
+    # Replace nlplug-findfs with timeout-wrapped version
+    # nlplug-findfs looks for Alpine-specific files and may hang on non-Alpine layouts.
+    # We wrap it with a 15s timeout so the SuperLite fallback kicks in promptly.
+    print "# SuperLite: nlplug-findfs with timeout (15s max)"
+    print "if command -v timeout >/dev/null 2>&1; then"
+    print "    timeout 15 nlplug-findfs $plugdevopts 2>/dev/null; _nlplug_ret=$?"
+    print "    [ $_nlplug_ret -eq 124 ] && echo \"[live] nlplug-findfs timed out (15s) — expected for SuperLite layout\""
+    print "elif command -v nlplug-findfs >/dev/null 2>&1; then"
+    print "    nlplug-findfs $plugdevopts 2>/dev/null & _nlplug_pid=$!"
+    print "    ( sleep 15 && kill $_nlplug_pid 2>/dev/null ) & _nlplug_timer=$!"
+    print "    wait $_nlplug_pid 2>/dev/null; _nlplug_ret=$?"
+    print "    kill $_nlplug_timer 2>/dev/null; wait $_nlplug_timer 2>/dev/null"
+    print "else"
+    print "    _nlplug_ret=1"
+    print "fi"
+    # Skip the original nlplug-findfs command and its continuation lines
     while (getline nextline > 0) {
         if (nextline ~ /eend/) {
             # Replace eend $? with silent capture
-            print "_nlplug_ret=$?"
             print "if [ $_nlplug_ret -eq 0 ]; then"
             print "    eend 0"
             print "else"
@@ -228,8 +240,8 @@ in_boot && /nlplug-findfs/ {
             print "fi"
             break
         } else if (nextline ~ /^[[:space:]]/) {
-            # Continuation of nlplug-findfs command
-            print nextline
+            # Skip original continuation lines (we replaced the whole command)
+            continue
         } else {
             # Not part of nlplug-findfs, print and break
             print nextline

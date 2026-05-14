@@ -283,7 +283,36 @@ TERM="linux"
 GETTY_ARGS="--autologin root --noclear"
 EOF
 
-ln -sf /etc/init.d/agetty /etc/init.d/agetty.ttyS0 2>/dev/null || true
+# Create agetty.ttyS0 init script (hard copy, not symlink — squashfs may strip symlinks)
+if [ -f /etc/init.d/agetty ]; then
+    cp /etc/init.d/agetty /etc/init.d/agetty.ttyS0
+    chmod +x /etc/init.d/agetty.ttyS0
+else
+    # Create a minimal OpenRC init script for serial console
+    cat > /etc/init.d/agetty.ttyS0 << 'INITEOF'
+#!/sbin/openrc-run
+
+depend() {
+    after localmount
+    keyword -shutdown
+}
+
+start() {
+    ebegin "Starting agetty on ttyS0"
+    start-stop-daemon --start --exec /sbin/agetty \
+        -- --autologin root --noclear ttyS0 115200 linux
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping agetty on ttyS0"
+    start-stop-daemon --stop --exec /sbin/agetty
+    eend $?
+}
+INITEOF
+    chmod +x /etc/init.d/agetty.ttyS0
+fi
+
 rc-update add agetty.ttyS0 default 2>/dev/null || true
 
 # ── Create live user ─────────────────────────────────────────────────────────

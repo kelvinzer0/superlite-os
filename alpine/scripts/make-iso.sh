@@ -75,14 +75,34 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
     if [[ -n "$KVER" ]] && [[ -d "${ROOTFS}/lib/modules/$KVER" ]]; then
         chroot "${ROOTFS}" mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -5 || true
         if [[ -f "${ROOTFS}/boot/initramfs-lts" ]]; then
-            # ── Ensure busybox applets + critical modules in initrd ──
-            # Alpine's initramfs-init (already patched by patch-init.sh) handles
-            # live-boot via the _superlite_find_media fallback.
-            # We do NOT replace /init — the patched Alpine init is sufficient.
-            log "Patching initramfs: ensuring busybox applets and modules..."
+            log "Patching initramfs: ensuring busybox applets, modules, and custom init..."
             IRD_DIR="/tmp/superlite-ird-patch"
             rm -rf "$IRD_DIR" && mkdir -p "$IRD_DIR"
             (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
+
+            # ── Replace /init with SuperLite's custom live-boot init ──
+            # Alpine's patched init tries nlplug-findfs first (may hang on non-Alpine layouts).
+            # SuperLite's own init handles media detection directly — use it instead.
+            SUPERLITE_INIT=""
+            for candidate in \
+                "${ROOTFS}/tmp/hooks/superlite-live.init" \
+                "${SCRIPT_DIR}/../alpine/hooks/superlite-live.init" \
+                "${TOP_DIR}/alpine/hooks/superlite-live.init"; do
+                if [[ -f "$candidate" ]]; then
+                    SUPERLITE_INIT="$candidate"
+                    break
+                fi
+            done
+
+            if [[ -n "$SUPERLITE_INIT" ]]; then
+                log "Installing SuperLite live-boot init as /init"
+                # Back up Alpine's init as /init.alpine for debugging
+                [[ -f "$IRD_DIR/init" ]] && cp "$IRD_DIR/init" "$IRD_DIR/init.alpine"
+                cp "$SUPERLITE_INIT" "$IRD_DIR/init"
+                chmod +x "$IRD_DIR/init"
+            else
+                log "WARNING: superlite-live.init not found — using patched Alpine init"
+            fi
 
             # Create missing busybox symlinks
             if [[ -f "$IRD_DIR/bin/busybox" ]]; then
@@ -102,15 +122,15 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             fi
 
             # ── Verify critical modules are in initrd ──
-            # squashfs and loop must be present for live-boot
+            # All these must be present for live-boot to work
             KVER_IRD=$(ls "$IRD_DIR/lib/modules/" 2>/dev/null | head -1 || echo "")
             if [[ -n "$KVER_IRD" ]]; then
-                for mod in squashfs loop isofs; do
-                    if ! find "$IRD_DIR/lib/modules/$KVER_IRD" -name "${mod}.ko*" | grep -q .; then
+                for mod in squashfs loop isofs sr_mod usb-storage sd_mod nls_cp437 nls_iso8859_1; do
+                    if ! find "$IRD_DIR/lib/modules/$KVER_IRD" -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" 2>/dev/null | grep -q .; then
                         log "WARNING: $mod module missing in initrd — copying from rootfs..."
                         KVER_ROOT=$(ls "${ROOTFS}/lib/modules/" 2>/dev/null | head -1 || echo "")
                         if [[ -n "$KVER_ROOT" ]]; then
-                            find "${ROOTFS}/lib/modules/$KVER_ROOT" -name "${mod}.ko*" \
+                            find "${ROOTFS}/lib/modules/$KVER_ROOT" \( -name "${mod}.ko*" -o -name "${mod//_/-}.ko*" \) \
                                 -exec cp {} "$IRD_DIR/lib/modules/$KVER_IRD/kernel/" \; 2>/dev/null
                         fi
                     fi
@@ -124,7 +144,6 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             # Verify /init exists and is executable
             if [[ ! -x "$IRD_DIR/init" ]]; then
                 log "WARNING: /init missing in initramfs — this will cause kernel panic!"
-                # Create minimal fallback init
                 cat > "$IRD_DIR/init" << 'INIT_FALLBACK'
 #!/bin/sh
 mount -t proc proc /proc 2>/dev/null
@@ -137,15 +156,14 @@ INIT_FALLBACK
                 chmod +x "$IRD_DIR/init"
             fi
 
-            # Log /init shebang for debugging
+            # Log /init for debugging
             log "Initramfs /init: $(head -1 "$IRD_DIR/init" 2>/dev/null || echo 'EMPTY')"
-            log "Initramfs /bin/sh: $(ls -la "$IRD_DIR/bin/sh" 2>/dev/null || echo 'MISSING')"
 
             (cd "$IRD_DIR" && find . | cpio -o -H newc 2>/dev/null | gzip -9 > "${ROOTFS}/boot/initramfs-lts")
             rm -rf "$IRD_DIR"
             cp "${ROOTFS}/boot/initramfs-lts" "${ISO_DIR}/boot/initramfs-lts"
             INITRAMFS_OK=true
-            log "Initramfs patched (busybox applets + modules added, Alpine init preserved)"
+            log "Initramfs patched (SuperLite init + busybox applets + critical modules)"
         fi
     fi
 
