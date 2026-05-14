@@ -44,7 +44,7 @@ jobs:
           sudo chown $(id -u):$(id -g) ./vmlinuz-lts ./initramfs-lts
           # Boot with -kernel + -initrd + -append (required for serial console in CI)
           # Use accel=tcg (software emulation) — KVM not available in CI runners
-          timeout 120s qemu-system-x86_64 \
+          timeout 300s qemu-system-x86_64 \
             -kernel ./vmlinuz-lts \
             -initrd ./initramfs-lts \
             -append "console=ttyS0 boot=live loglevel=7" \
@@ -53,6 +53,7 @@ jobs:
             -machine accel=tcg \
             -nographic \
             -serial mon:stdio \
+            -no-reboot \
             -cdrom "$ISO_FILE" \
             | tee boot.log || true
           # Cek apakah boot berhasil sampai login prompt
