@@ -237,8 +237,14 @@ for binpath in "${LDD_BINARIES[@]}"; do
     if command -v readelf &>/dev/null; then
         NEEDED_LIBS=$(readelf -d "$FULLPATH" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
         for lib in $NEEDED_LIBS; do
-            # Search for the library in rootfs
-            if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "$lib" 2>/dev/null | head -1 | grep -q .; then
+            # Search for the library in rootfs (handle versioned names: libfoo.so.0 -> libfoo.so.0.25.0)
+            if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "${lib}*" 2>/dev/null | head -1 | grep -q .; then
+                # Special case: musl libc (libc.musl-x86_64.so.1 is the dynamic linker)
+                if [[ "$lib" == "libc.musl"* ]]; then
+                    if find "$ROOTFS/lib" -name "ld-musl*" 2>/dev/null | head -1 | grep -q .; then
+                        continue  # musl found, skip
+                    fi
+                fi
                 MISSING_LIBS="$MISSING_LIBS $lib"
             fi
         done
@@ -282,7 +288,14 @@ for libpat in "${CHECK_LIBS[@]}"; do
     NEEDED_LIBS=$(readelf -d "$LIB_FILE" 2>/dev/null | grep "NEEDED" | sed 's/.*\[\(.*\)\]/\1/' || true)
     LIB_MISSING=""
     for lib in $NEEDED_LIBS; do
-        if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "$lib" 2>/dev/null | head -1 | grep -q .; then
+        # Handle versioned names: libfoo.so.0 -> libfoo.so.0.25.0
+        if ! find "$ROOTFS/usr/lib" "$ROOTFS/lib" "$ROOTFS/lib64" -name "${lib}*" 2>/dev/null | head -1 | grep -q .; then
+            # Special case: musl libc
+            if [[ "$lib" == "libc.musl"* ]]; then
+                if find "$ROOTFS/lib" -name "ld-musl*" 2>/dev/null | head -1 | grep -q .; then
+                    continue
+                fi
+            fi
             LIB_MISSING="$LIB_MISSING $lib"
         fi
     done
