@@ -39,9 +39,8 @@ gammastep
 brightnessctl
 gsettings-desktop-schemas
 
-# --- Fonts & Themes ---
+# --- Fonts & Cursors ---
 font-awesome
-font-terminus
 simp1e-cursors
 
 # --- Networking ---

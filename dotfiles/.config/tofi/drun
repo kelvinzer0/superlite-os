@@ -1,6 +1,6 @@
 # SuperLite OS — Tofi drun launcher config
 
-font = Misc OhSnap
+font = DejaVu Sans
 font-size = 9
 background-color = #FFFACD
 text-color = #000000
