@@ -276,7 +276,7 @@ if ! find_boot_media; then
     LIVE_ERR "No boot media found!"
     LIVE_ERR ""
     LIVE_ERR "Available block devices:"
-    for dev in /dev/sd* /dev/mmcblk* /dev/nvme* /dev/vd* /dev/sr* /dev/cdrom 2>/dev/null; do
+    for dev in /dev/sd* /dev/mmcblk* /dev/nvme* /dev/vd* /dev/sr* /dev/cdrom; do
         [ -b "$dev" ] && LIVE_ERR "  $dev"
     done
     LIVE_ERR ""
