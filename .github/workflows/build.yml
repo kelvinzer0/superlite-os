@@ -27,43 +27,55 @@ jobs:
       - name: Build ISO
         run: sudo ./build.sh --verbose
 
-      - name: Test ISO
+      - name: Pre-build integrity check
+        run: |
+          # Extract rootfs from squashfs in the built ISO for validation
+          ISO_FILE=$(ls superlite-os-*.iso | head -1)
+          EXTRACT_DIR="/tmp/rootfs-check"
+          sudo mkdir -p "$EXTRACT_DIR"
+
+          # Mount the ISO and extract squashfs
+          ISO_MNT="/tmp/iso-mnt"
+          sudo mkdir -p "$ISO_MNT"
+          sudo mount -o loop "$ISO_FILE" "$ISO_MNT" 2>/dev/null || true
+
+          if [[ -f "$ISO_MNT/live/rootfs.squashfs" ]]; then
+            # Extract squashfs to temp dir for checking
+            sudo unsquashfs -f -d "$EXTRACT_DIR" "$ISO_MNT/live/rootfs.squashfs" 2>&1 | tail -3
+            sudo umount "$ISO_MNT" 2>/dev/null || true
+
+            # Run the pre-build integrity check
+            chmod +x ./tests/pre-build-check.sh
+            sudo ./tests/pre-build-check.sh "$EXTRACT_DIR"
+
+            # Cleanup
+            sudo rm -rf "$EXTRACT_DIR"
+          else
+            echo "WARNING: Could not find rootfs.squashfs in ISO"
+            sudo umount "$ISO_MNT" 2>/dev/null || true
+            # Fall back to checking the build rootfs directly
+            if [[ -d "./build/rootfs" ]]; then
+              chmod +x ./tests/pre-build-check.sh
+              sudo ./tests/pre-build-check.sh "./build/rootfs"
+            fi
+          fi
+
+      - name: Test ISO basic structure
         run: ./tests/test-build.sh
 
-      - name: Test ISO with QEMU
+      - name: Test ISO with QEMU (boot + desktop environment)
         run: |
           sudo apt-get install -y qemu-system-x86 qemu-utils
-          qemu-img create -f qcow2 testdisk.qcow2 2G
-          ISO_FILE=$(ls superlite-os-*.iso | head -1)
-          # Boot from ISO via bootloader (serial console configured in GRUB/syslinux)
-          # Use accel=tcg — KVM not available in CI runners
-          # -serial stdio captures bootloader + kernel serial output
-          timeout 180s sudo qemu-system-x86_64 \
-            -cdrom "$ISO_FILE" \
-            -drive file=testdisk.qcow2,format=qcow2 \
-            -m 2G \
-            -machine accel=tcg \
-            -nographic \
-            -serial mon:stdio \
-            -no-reboot \
-            -boot d \
-            2>&1 | tee boot.log || true
-          echo "=== Boot log (last 80 lines) ==="
-          tail -80 boot.log
-          # Check for kernel panic or boot failure
-          if grep -q "Kernel panic" boot.log; then
-            echo "FAILED: Kernel panic detected"
-            exit 1
-          fi
-          # Check for signs of successful boot (any of these is good)
-          if grep -qi "login:" boot.log || grep -qi "superlite" boot.log || \
-             grep -qi "Welcome" boot.log || grep -qi "Alpine" boot.log || \
-             grep -qi "initramfs" boot.log || grep -qi "\[live\]" boot.log; then
-            echo "SUCCESS: Boot reached userspace or live init"
-            exit 0
-          fi
-          echo "FAILED: No sign of successful boot"
-          exit 1
+          chmod +x ./tests/test-qemu-de.sh
+          ./tests/test-qemu-de.sh
+
+      - name: Upload boot log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-log
+          path: /tmp/superlite-boot-de.log
+          retention-days: 7
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
