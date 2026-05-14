@@ -1,7 +1,7 @@
 # SuperLite OS — Tofi launcher (LabWC-Alpine-Netbook style)
 # Lemon-chiffon + black
 
-font = DejaVu Sans
+font = Misc OhSnap
 font-size = 9
 background-color = #FFFACD
 text-color = #000000

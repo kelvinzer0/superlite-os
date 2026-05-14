@@ -185,6 +185,12 @@ configure_rootfs() {
         cp "${SCRIPT_DIR}/alpine/scripts/install-themes.sh" "${ROOTFS_DIR}/tmp/hooks/"
     fi
 
+    # Copy pre-built themes (WhiteSur, Haiku, OhSnap)
+    if [[ -d "${SCRIPT_DIR}/alpine/packages/themes" ]]; then
+        mkdir -p "${ROOTFS_DIR}/tmp/themes"
+        cp "${SCRIPT_DIR}/alpine/packages/themes/"* "${ROOTFS_DIR}/tmp/themes/" 2>/dev/null || true
+    fi
+
     # Copy mkinitfs config
     if [[ -f "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" ]]; then
         cp "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" "${ROOTFS_DIR}/tmp/hooks/"

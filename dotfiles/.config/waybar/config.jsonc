@@ -13,6 +13,7 @@
         "icon-size": 18,
         "on-click": "minimize-raise",
         "on-click-middle": "close",
+        "icon-theme": "Haiku",
         "rewrite": {
             "Firefox": "",
             "Foot": "🗖",

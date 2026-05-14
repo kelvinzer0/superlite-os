@@ -23,25 +23,25 @@
     <keepBorder>yes</keepBorder>
     <dropShadows>no</dropShadows>
     <font place="ActiveWindow">
-      <name>DejaVu Sans</name>
+      <name>Misc OhSnap</name>
       <size>8</size>
       <slant>normal</slant>
       <weight>bold</weight>
     </font>
     <font place="InActiveWindow">
-      <name>DejaVu Sans</name>
+      <name>Misc OhSnap</name>
       <size>8</size>
       <slant>normal</slant>
       <weight>bold</weight>
     </font>
     <font place="MenuItem">
-      <name>DejaVu Sans</name>
+      <name>Misc OhSnap</name>
       <size>8</size>
       <slant>normal</slant>
       <weight>bold</weight>
     </font>
     <font place="OnScreenDisplay">
-      <name>DejaVu Sans</name>
+      <name>Misc OhSnap</name>
       <size>12</size>
       <slant>normal</slant>
       <weight>normal</weight>

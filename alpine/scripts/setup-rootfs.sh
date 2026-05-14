@@ -265,7 +265,7 @@ rm -rf /usr/lib/pkgconfig /usr/lib/cmake /usr/include
 rm -rf /usr/share/pkgconfig
 
 # Remove APK cache and temp files
-rm -rf /tmp/packages.list /tmp/repositories /tmp/dotfiles /tmp/setup-rootfs.sh /tmp/hooks
+rm -rf /tmp/packages.list /tmp/repositories /tmp/dotfiles /tmp/setup-rootfs.sh /tmp/hooks /tmp/themes
 apk cache clean 2>/dev/null
 rm -rf /var/cache/apk/*
 

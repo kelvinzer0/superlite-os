@@ -1,66 +1,64 @@
 #!/bin/sh
 # ============================================================================
 # SuperLite OS — Theme Installer
-# Builds and installs WhiteSur-Light GTK theme
+# Installs pre-built themes from RiccardoPP's LabWC-Alpine-Netbook dotfiles:
+#   - WhiteSur-Light GTK theme
+#   - Haiku icon theme
+#   - Misc OhSnap bitmap font
+#
 # Called from setup-rootfs.sh inside chroot
+# Files expected at /tmp/themes/
 # ============================================================================
 set -e
 
-echo "[themes] Installing WhiteSur-Light theme..."
+echo "[themes] Installing themes from RiccardoPP's dotfiles..."
 
+THEMES_DIR="/tmp/themes"
+
+if [ ! -d "$THEMES_DIR" ]; then
+    echo "[themes] WARNING: /tmp/themes not found, skipping"
+    exit 0
+fi
+
+# ── 1. WhiteSur-Light GTK theme ─────────────────────────────────────────────
+echo "[themes] Installing WhiteSur-Light..."
 mkdir -p /usr/share/themes
-
-# Check if sassc is available (needed to build GTK theme)
-if ! command -v sassc >/dev/null 2>&1; then
-    echo "[themes] sassc not found, installing..."
-    apk add sassc 2>/dev/null || true
-fi
-
-# Download WhiteSur theme source
-WHITESUR_URL="https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/heads/master.tar.gz"
-
-if command -v wget >/dev/null 2>&1; then
-    wget -q -O /tmp/whitesur.tar.gz "$WHITESUR_URL" 2>/dev/null || true
-fi
-
-if [ ! -f /tmp/whitesur.tar.gz ]; then
-    echo "[themes] WARNING: Could not download WhiteSur theme, falling back to Adwaita"
-    exit 0
-fi
-
-tar xzf /tmp/whitesur.tar.gz -C /tmp/ 2>/dev/null || true
-WHITESUR_DIR=$(ls -d /tmp/WhiteSur-gtk-theme-* 2>/dev/null | head -1)
-
-if [ -z "$WHITESUR_DIR" ] || [ ! -d "$WHITESUR_DIR" ]; then
-    echo "[themes] WARNING: Could not extract WhiteSur theme"
-    rm -f /tmp/whitesur.tar.gz
-    exit 0
-fi
-
-# Install only Light variant to save space
-cd "$WHITESUR_DIR"
-if [ -f "./install.sh" ]; then
-    chmod +x ./install.sh
-    # -c standard = default color scheme
-    # -o normal = normal opacity
-    # --dest /usr/share/themes = install location
-    # Only install Light variant (no dark)
-    ./install.sh -c standard -o normal --dest /usr/share/themes 2>&1 | tail -5 || {
-        echo "[themes] WARNING: WhiteSur install.sh failed, trying manual copy..."
-        # Fallback: try to find pre-built theme files
-        if [ -d "src/WhiteSur-Light" ]; then
-            cp -r src/WhiteSur-Light /usr/share/themes/ 2>/dev/null || true
-        fi
-    }
+if [ -f "$THEMES_DIR/WhiteSur-Light.tar.xz" ]; then
+    tar xf "$THEMES_DIR/WhiteSur-Light.tar.xz" -C /usr/share/themes/ 2>/dev/null
     echo "[themes] WhiteSur-Light installed"
 else
-    echo "[themes] WARNING: install.sh not found"
+    echo "[themes] WARNING: WhiteSur-Light.tar.xz not found"
 fi
 
-cd /
-rm -rf /tmp/whitesur.tar.gz "$WHITESUR_DIR" 2>/dev/null
+# ── 2. Haiku icon theme ─────────────────────────────────────────────────────
+echo "[themes] Installing Haiku icons..."
+mkdir -p /usr/share/icons
+if [ -f "$THEMES_DIR/Haiku.gz" ]; then
+    tar xzf "$THEMES_DIR/Haiku.gz" -C /usr/share/icons/ 2>/dev/null
+    echo "[themes] Haiku icons installed"
+else
+    echo "[themes] WARNING: Haiku.gz not found"
+fi
 
-# Refresh icon cache
+# ── 3. Misc OhSnap font ─────────────────────────────────────────────────────
+echo "[themes] Installing OhSnap font..."
+mkdir -p /usr/share/fonts/misc
+if [ -f "$THEMES_DIR/ohsnap.zip" ]; then
+    cd /tmp
+    unzip -o "$THEMES_DIR/ohsnap.zip" -d /tmp/ohsnap-extract 2>/dev/null || true
+    # Find .pcf or .bdf font files and install
+    find /tmp/ohsnap-extract -type f \( -name "*.pcf" -o -name "*.pcf.gz" -o -name "*.bdf" \) -exec cp {} /usr/share/fonts/misc/ \; 2>/dev/null || true
+    rm -rf /tmp/ohsnap-extract
+    echo "[themes] OhSnap font installed"
+else
+    echo "[themes] WARNING: ohsnap.zip not found"
+fi
+
+# ── 4. Refresh caches ───────────────────────────────────────────────────────
+echo "[themes] Refreshing caches..."
+fc-cache -f 2>/dev/null || true
+gtk-update-icon-cache /usr/share/icons/Haiku 2>/dev/null || true
 gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+gtk-update-icon-cache /usr/share/themes/WhiteSur-Light 2>/dev/null || true
 
-echo "[themes] Done."
+echo "[themes] All themes installed."
