@@ -83,7 +83,7 @@ if [[ -x "${ROOTFS}/usr/bin/mkinitfs" ]] || [[ -f "${ROOTFS}/sbin/mkinitfs" ]]; 
             SUPERLITE_INIT="${ROOTFS}/etc/mkinitfs/superlite-live.init"
             if [[ -f "$SUPERLITE_INIT" ]]; then
                 log "Patching initramfs: replacing /init with superlite-live.init..."
-                local IRD_DIR="/tmp/superlite-ird-patch"
+                IRD_DIR="/tmp/superlite-ird-patch"
                 rm -rf "$IRD_DIR" && mkdir -p "$IRD_DIR"
                 (cd "$IRD_DIR" && zcat "${ROOTFS}/boot/initramfs-lts" | cpio -id 2>/dev/null)
                 cp "$SUPERLITE_INIT" "$IRD_DIR/init"
