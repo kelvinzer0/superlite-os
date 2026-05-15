@@ -51,13 +51,16 @@ https://dl-cdn.alpinelinux.org/alpine/edge/community
 https://dl-cdn.alpinelinux.org/alpine/edge/testing
 EOF
 
-# ── Trust CDROM repo (no signature check for local media) ─────────────────────
+# ── Trust CDROM: copy all available apk signing keys ──────────────────────────
 mkdir -p "$tmp"/etc/apk/keys
-# Copy build key into overlay so CDROM packages are trusted
-# This file will be overwritten by the actual key during build
-makefile root:root 0644 "$tmp"/etc/apk/keys/cdrom.trusted <<EOF
-# Placeholder: actual key injected by build.sh
-EOF
+# Copy Alpine default keys
+for _keydir in /etc/apk/keys /usr/share/apk/keys/x86_64; do
+    [ -d "$_keydir" ] && cp "$_keydir"/* "$tmp"/etc/apk/keys/ 2>/dev/null || true
+done
+# Copy build signing key (so CDROM packages are trusted)
+for _keyfile in /home/build/.abuild/*.pub /root/.abuild/*.pub; do
+    [ -f "$_keyfile" ] && cp "$_keyfile" "$tmp"/etc/apk/keys/ 2>/dev/null || true
+done
 
 # ── Package world (for post-boot apk add) ─────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/apk/world <<EOF

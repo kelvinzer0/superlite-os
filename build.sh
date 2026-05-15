@@ -78,9 +78,12 @@ if [[ "$USE_DOCKER" == true ]]; then
             chown build:build /build/output
 
             # Build ISO (must run as non-root)
+            PRIVKEY=$(ls /home/build/.abuild/build-*.rsa 2>/dev/null | head -1)
+            PUBKEY=$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
+            echo "Signing with: $PRIVKEY"
             su build -c "
-                PACKAGER_PRIVKEY=\$(ls /home/build/.abuild/build-*.rsa | head -1) \
-                PACKAGER_PUBKEY=\$(ls /home/build/.abuild/build-*.rsa.pub | head -1) \
+                PACKAGER_PRIVKEY=$PRIVKEY \
+                PACKAGER_PUBKEY=$PUBKEY \
                 cd /home/build/aports/scripts && ./mkimage.sh \
                     --profile superlite \
                     --arch x86_64 \
