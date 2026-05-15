@@ -39,7 +39,7 @@ profile_superlite() {
         micro helix lazygit
         bluez
         tlp
-        shadow
+        shadow shadow-login
         grub-efi grub-bios syslinux squashfs-tools xorriso mkinitfs mtools dosfstools lua5.4
         sudo polkit
     "

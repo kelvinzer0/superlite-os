@@ -103,6 +103,8 @@ rc_add dbus default
 rc_add networkmanager default
 rc_add chronyd default
 rc_add sshd default
+rc_add agetty.tty1 default
+rc_add agetty.ttyS0 default
 
 rc_add mount-ro shutdown
 rc_add killprocs shutdown
@@ -112,7 +114,7 @@ rc_add savecache shutdown
 mkdir -p "$tmp"/etc/conf.d
 makefile root:root 0644 "$tmp"/etc/conf.d/agetty.tty1 <<EOF
 BAUDRATE="115200"
-TERM="foot"
+TERM="xterm-256color"
 GETTY_ARGS="--autologin root --noclear"
 EOF
 
