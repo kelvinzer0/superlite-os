@@ -12,7 +12,7 @@
 #
 # Requirements (Debian/Ubuntu host):
 #   sudo apt install squashfs-tools xorriso mtools dosfstools \
-#     qemu-user-static binfmt-support wget ca-certificates
+#     wget ca-certificates
 # ============================================================================
 
 set -euo pipefail
@@ -94,7 +94,7 @@ check_deps() {
     fi
 
     if [[ ${#missing[@]} -gt 0 ]]; then
-        die "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install squashfs-tools xorriso mtools dosfstools qemu-user-static binfmt-support wget"
+        die "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install squashfs-tools xorriso mtools dosfstools wget"
     fi
 
     # Check root for chroot operations
@@ -144,11 +144,6 @@ create_rootfs() {
 
     # Copy resolv.conf for DNS
     cp /etc/resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
-
-    # Copy QEMU static binary for cross-arch chroot (if available)
-    if [[ -f /usr/bin/qemu-x86_64-static ]]; then
-        cp /usr/bin/qemu-x86_64-static "${ROOTFS_DIR}/usr/bin/" 2>/dev/null || true
-    fi
 
     log_info "Rootfs created at ${ROOTFS_DIR}"
 }
@@ -274,9 +269,6 @@ main() {
     log_info "═══════════════════════════════════════════════"
     log_info "Build complete!"
     log_info "ISO: ${OUTPUT_DIR}/${ISO_NAME}"
-    log_info ""
-    log_info "Test with QEMU:"
-    log_info "  qemu-system-x86_64 -m 2048 -cdrom ${ISO_NAME} -boot d"
     log_info ""
     log_info "Write to USB:"
     log_info "  sudo dd if=${ISO_NAME} of=/dev/sdX bs=4M status=progress"

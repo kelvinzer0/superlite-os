@@ -171,7 +171,7 @@ _superlite_find_media() {
     done
 
     # Give SCSI/IDE/USB controllers time to register devices
-    # QEMU virtio is fast, but real hardware needs more time
+    # Give SCSI/IDE/USB controllers time to register devices
     echo "[live] Waiting for storage controllers to settle..."
     sleep 5
 

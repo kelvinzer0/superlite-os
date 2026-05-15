@@ -53,13 +53,6 @@ sudo dd if=superlite-os-*.iso of=/dev/sdX bs=4M status=progress
 
 **Ventoy:** Copy ISO to Ventoy USB drive, boot from it
 
-**QEMU:**
-```bash
-make test-qemu
-# or with UEFI:
-make test-qemu-efi
-```
-
 ## Keybindings
 
 | Key | Action |
@@ -101,7 +94,7 @@ superlite-os/
 │   ├── boot/syslinux/          # Syslinux (Legacy BIOS)
 │   └── EFI/BOOT/               # EFI boot binary
 ├── Makefile                    # Build targets
-└── tests/                      # Build tests
+└── README.md
 ```
 
 ## Build Process

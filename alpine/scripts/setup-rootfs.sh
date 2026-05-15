@@ -276,7 +276,7 @@ TERM="foot"
 GETTY_ARGS="--autologin root --noclear"
 EOF
 
-# ── Auto-login on serial console (ttyS0) for CI/QEMU/headless ──────────────
+# ── Auto-login on serial console (ttyS0) for CI/headless ──────────────────
 cat > /etc/conf.d/agetty.ttyS0 << 'EOF'
 BAUDRATE="115200"
 TERM="linux"

@@ -3,7 +3,7 @@
 -- SuperLite OS — Live Boot Init (Lua)
 -- ============================================================================
 -- Robust Lua-based init for Alpine live-boot.
--- Fixes all issues found in QEMU testing:
+-- Fixes all issues found in testing:
 --   - squashfs module not in modules.dep → insmod fallback
 --   - tmpfs hiding squashfs mount → separate mount points
 --   - overlayfs workdir/upperdir same mount → single tmpfs
