@@ -35,6 +35,14 @@ jobs:
           docker rmi $(docker image ls -aq) 2>/dev/null || true
           df -h /
 
+      - name: Disable AppArmor user namespace restriction
+        run: |
+          # BitBake needs unprivileged user namespaces (Ubuntu 24.04 restricts them)
+          echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          # Persist across reboots
+          echo "kernel.apparmor_restrict_unprivileged_userns = 0" | sudo tee -a /etc/sysctl.d/99-yocto.conf
+          sudo sysctl -p /etc/sysctl.d/99-yocto.conf
+
       - name: Install Yocto build dependencies
         run: |
           sudo apt-get update
