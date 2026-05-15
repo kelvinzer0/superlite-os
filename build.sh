@@ -184,10 +184,22 @@ EOF
 build_image() {
     log_step "Initializing BitBake environment..."
     cd "$POKY_DIR"
-    # oe-init-build-env uses unbound vars (BBSERVER, etc.) — relax strict mode
+
+    # oe-init-build-env only creates default conf if bblayers.conf doesn't exist.
+    # Our configure_build() already wrote it, so just source to set PATH/env vars.
     set +u
-    source oe-init-build-env "$BUILD_DIR"
+    source oe-init-build-env "$BUILD_DIR" > /dev/null 2>&1 || true
     set -u
+
+    # Verify our layer is in bblayers.conf (not the Poky default)
+    if ! grep -q "meta-superlite" "${BUILD_DIR}/conf/bblayers.conf" 2>/dev/null; then
+        log_warn "bblayers.conf was overwritten by Poky default. Re-configuring..."
+        configure_build
+        cd "$POKY_DIR"
+        set +u
+        source oe-init-build-env "$BUILD_DIR" > /dev/null 2>&1 || true
+        set -u
+    fi
 
     if [[ "$SETUP_ONLY" == true ]]; then
         log_info "Setup complete. To build manually:"

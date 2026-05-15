@@ -62,10 +62,12 @@ jobs:
 
       - name: Build SuperLite OS image
         run: |
-          cd build
+          cd build/poky
           set +u
-          source poky/oe-init-build-env build
+          source oe-init-build-env ../../build > /dev/null 2>&1 || true
           set -u
+          # Verify layer is registered
+          bitbake-layers show-layers
           bitbake superlite-os-image
 
       - name: Generate bootable ISO
