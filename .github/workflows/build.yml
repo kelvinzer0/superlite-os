@@ -1,31 +1,71 @@
-name: Build SuperLite OS ISO
+name: Build SuperLite OS ISO (Yocto)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate layer structure
+        run: |
+          chmod +x ./tests/validate-build.sh
+          ./tests/validate-build.sh
+
   build:
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Free disk space
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo apt-get clean
+          docker rmi $(docker image ls -aq) 2>/dev/null || true
+          df -h /
+
+      - name: Install Yocto build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            squashfs-tools xorriso mtools dosfstools \
-            wget ca-certificates syslinux syslinux-utils xz-utils cpio
+            gawk wget git diffstat unzip texinfo gcc build-essential \
+            chrpath socat cpio python3 python3-pip python3-pexpect \
+            python3-git python3-jinja2 python3-subunit zstd liblz4-tool \
+            file locales libacl1 squashfs-tools xorriso mtools dosfstools \
+            syslinux syslinux-utils xz-utils
 
-      - name: Build ISO
-        run: sudo ./build.sh --verbose
+          sudo locale-gen en_US.UTF-8
+
+      - name: Setup Yocto environment
+        run: |
+          chmod +x ./build.sh
+          ./build.sh --setup-only
+
+      - name: Build SuperLite OS image
+        run: |
+          cd build
+          source poky/oe-init-build-env build
+          bitbake superlite-os-image
+
+      - name: Generate bootable ISO
+        run: |
+          bash meta-superlite/recipes-apps/superlite-live/superlite-live/superlite-boot.sh \
+            --build-dir build \
+            --output "superlite-os-$(date +%Y%m%d).iso"
 
       - name: Validate build output
-        run: |
-          chmod +x ./tests/validate-build.sh
-          ./tests/validate-build.sh
+        run: ./tests/validate-build.sh
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
@@ -33,6 +73,16 @@ jobs:
           name: superlite-os-iso
           path: superlite-os-*.iso
           retention-days: 14
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build/tmp-glibc/work/*/temp/log.*
+            build/tmp-glibc/deploy/images/
+          retention-days: 7
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
