@@ -28,6 +28,65 @@ jobs:
           path: output/*.iso
           retention-days: 14
 
+      - name: QEMU Smoke Test
+        run: |
+          ISO=$(find output -name "*.iso" -type f | head -1)
+          echo "Testing ISO: $ISO"
+          
+          # Install QEMU
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf >/dev/null
+          
+          # Boot ISO in QEMU (headless, serial console, timeout 120s)
+          echo "Booting ISO in QEMU (serial console)..."
+          timeout 120 qemu-system-x86_64 \
+            -m 1024 \
+            -nographic \
+            -no-reboot \
+            -cdrom "$ISO" \
+            -boot d \
+            -serial mon:stdio \
+            2>&1 | tee /tmp/qemu-boot.log &
+          
+          QEMU_PID=$!
+          
+          # Wait for boot (check for login prompt or kernel messages)
+          echo "Waiting for boot..."
+          BOOT_OK=false
+          for i in $(seq 1 60); do
+            sleep 2
+            if grep -qiE "(login:|Welcome to SuperLite|Alpine Linux|superlite)" /tmp/qemu-boot.log 2>/dev/null; then
+              echo "✓ Boot successful! System reached login prompt."
+              BOOT_OK=true
+              break
+            fi
+            # Check for kernel panic
+            if grep -qi "kernel panic" /tmp/qemu-boot.log 2>/dev/null; then
+              echo "✗ Kernel panic detected!"
+              break
+            fi
+            echo "  Waiting... ($i/60)"
+          done
+          
+          # Cleanup
+          kill $QEMU_PID 2>/dev/null || true
+          wait $QEMU_PID 2>/dev/null || true
+          
+          # Show last 30 lines of boot log
+          echo ""
+          echo "=== Boot Log (last 30 lines) ==="
+          tail -30 /tmp/qemu-boot.log
+          echo "================================"
+          
+          if [ "$BOOT_OK" = true ]; then
+            echo ""
+            echo "✓ QEMU smoke test PASSED"
+          else
+            echo ""
+            echo "✗ QEMU smoke test FAILED — no login prompt detected"
+            exit 1
+          fi
+
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
