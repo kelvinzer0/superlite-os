@@ -19,6 +19,7 @@ SRC_URI = "git://git.yoctoproject.org/linux-yocto.git;protocol=https;branch=v6.1
 
 SRCREV_machine = "${AUTOREV}"
 SRCREV_meta = "${AUTOREV}"
+SRCREV_FORMAT = "machine_meta"
 
 PV = "${LINUX_VERSION}+git"
 
