@@ -186,16 +186,16 @@ configure_rootfs() {
         cp "${SCRIPT_DIR}/alpine/packages/themes/"* "${ROOTFS_DIR}/tmp/themes/" 2>/dev/null || true
     fi
 
-    # Copy mkinitfs config
-    if [[ -f "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" ]]; then
-        cp "${SCRIPT_DIR}/alpine/packages/mkinitfs-superlite.conf" "${ROOTFS_DIR}/tmp/hooks/"
-    fi
-
-    # Copy init patcher script (patches Alpine's init for live-boot support)
-    if [[ -f "${SCRIPT_DIR}/alpine/scripts/patch-init.sh" ]]; then
-        cp "${SCRIPT_DIR}/alpine/scripts/patch-init.sh" "${ROOTFS_DIR}/tmp/hooks/"
-        chmod +x "${ROOTFS_DIR}/tmp/hooks/patch-init.sh"
-    fi
+    # Copy mkinitfs config and live-boot feature hook
+    for f in mkinitfs-superlite.conf superlite-live; do
+        [[ -f "${SCRIPT_DIR}/alpine/packages/$f" ]] && \
+            cp "${SCRIPT_DIR}/alpine/packages/$f" "${ROOTFS_DIR}/tmp/hooks/"
+    done
+    # Copy Lua live init + wrapper from hooks
+    for f in superlite-live.init superlite-init-wrapper; do
+        [[ -f "${SCRIPT_DIR}/alpine/hooks/$f" ]] && \
+            cp "${SCRIPT_DIR}/alpine/hooks/$f" "${ROOTFS_DIR}/tmp/hooks/"
+    done
 
     # Run setup inside chroot
     log_info "Running setup-rootfs.sh inside chroot (this may take a while)..."

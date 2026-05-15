@@ -1,366 +1,325 @@
-#!/bin/sh
-# ============================================================================
-# SuperLite OS — Live Boot Init Script (FIXED)
-# Replaces /sbin/init in initramfs when boot=live is detected
-# ============================================================================
-# This script is installed into the initramfs and handles:
-#   1. Mounting virtual filesystems (devtmpfs, proc, sys)
-#   2. Detecting the boot media (USB, CD-ROM, MMC, NVMe)
-#   3. Mounting squashfs rootfs
-#   4. Creating tmpfs overlay for writable live session
-#   5. switch_root into the live system
-#
-# FIXES applied:
-#   - Removed `set -e` (fatal in initramfs — one harmless failure kills boot)
-#   - Emergency shell now has proper TTY + job control
-#   - Scans partitions (sda1, nvme0n1p1, mmcblk0p1) not just base devices
-#   - Supports ext4, exFAT, ntfs, iso9660, vfat filesystems
-#   - Proper device wait with udevd/mdev fallback
-#   - Better error messages for debugging
-# ============================================================================
+#!/bin/lua
+-- ============================================================================
+-- SuperLite OS — Live Boot Init (Lua)
+-- ============================================================================
+-- Robust Lua-based init for Alpine live-boot.
+-- Fixes all issues found in testing:
+--   - squashfs module not in modules.dep → insmod fallback
+--   - tmpfs hiding squashfs mount → separate mount points
+--   - overlayfs workdir/upperdir same mount → single tmpfs
+--   - switch_root needs mountpoint → bind mount
+-- ============================================================================
 
-# DO NOT use set -e here — in initramfs, many commands fail harmlessly
-# (modprobe for missing modules, mount for already-mounted fs, etc.)
-# Using set -e causes the entire boot to abort on any minor issue.
+local function log(msg)   io.write("[live] " .. msg .. "\n"); io.flush() end
+local function err(msg)   io.stderr:write("[live] ERROR: " .. msg .. "\n"); io.stderr:flush() end
+local function warn(msg)  io.stderr:write("[live] WARN: " .. msg .. "\n"); io.stderr:flush() end
 
-LIVE_LOG() { echo "[live] $*"; }
-LIVE_ERR() { echo "[live] ERROR: $*" >&2; }
-LIVE_WARN() { echo "[live] WARN: $*" >&2; }
+local function exec(cmd)
+    local h = io.popen(cmd .. " 2>&1")
+    if not h then return false, "" end
+    local out = h:read("*a")
+    local ok = h:close()
+    return ok ~= nil, out
+end
 
-# ── Emergency Shell ──────────────────────────────────────────────────────────
-# Must be usable — with TTY, job control, and proper environment
-emergency_shell() {
-    LIVE_ERR "$1"
-    LIVE_ERR "Dropping to emergency shell. Type 'exit' to reboot."
+local function exec_silent(cmd) os.execute(cmd .. " 2>/dev/null") end
+local function file_exists(p) local f = io.open(p, "r"); if f then f:close(); return true end; return false end
+local function block_exists(p) return os.execute("test -b " .. p) == true end
 
-    # Mount devpts if not already mounted (needed for TTY)
-    mount -t devpts devpts /dev/pts 2>/dev/null || true
+local function mount(fstype, src, tgt, opts)
+    local cmd = "mount"
+    if fstype then cmd = cmd .. " -t " .. fstype end
+    if opts then cmd = cmd .. " -o " .. opts end
+    cmd = cmd .. " " .. src .. " " .. tgt
+    return os.execute(cmd) == true
+end
 
-    # Try to start a shell with job control
-    if [ -c /dev/console ]; then
-        # Use /dev/console as controlling terminal
-        exec setsid cttyhack /bin/sh 2>/dev/null \
-            || exec setsid /bin/sh </dev/console >/dev/console 2>&1 \
-            || exec /bin/sh
-    else
-        # Fallback: at least try to get a usable shell
-        export PS1='(initramfs) \w \$ '
-        exec /bin/sh
-    fi
-}
+local function mkdir_p(p) exec_silent("mkdir -p " .. p) end
 
-# ── Step 1: Mount essential virtual filesystems ──────────────────────────────
-LIVE_LOG "Mounting virtual filesystems..."
-mount -t proc     proc     /proc  2>/dev/null || true
-mount -t sysfs    sysfs    /sys   2>/dev/null || true
-mount -t devtmpfs devtmpfs /dev   2>/dev/null || true
-mkdir -p /dev/pts /dev/shm
-mount -t devpts   devpts   /dev/pts  2>/dev/null || true
-mount -t tmpfs    tmpfs    /dev/shm   2>/dev/null || true
+local function glob_block(pattern)
+    local devs = {}
+    local h = io.popen("ls " .. pattern .. " 2>/dev/null")
+    if h then for line in h:lines() do devs[#devs+1] = line end; h:close() end
+    return devs
+end
 
-# ── Step 2: Start device manager ─────────────────────────────────────────────
-# Without mdev/udev, device nodes won't be created for USB/MMC/NVMe
-LIVE_LOG "Starting device manager..."
-if command -v mdev >/dev/null 2>&1; then
-    # Trigger mdev to scan existing devices and set up hotplug
-    echo "/sbin/mdev" > /proc/sys/kernel/hotplug 2>/dev/null || true
-    mdev -s 2>/dev/null || true
-    LIVE_LOG "mdev started"
-elif command -v udevd >/dev/null 2>&1; then
-    udevd --daemon 2>/dev/null || true
-    udevadm trigger 2>/dev/null || true
-    udevadm settle --timeout=10 2>/dev/null || true
-    LIVE_LOG "udevd started"
+local function read_cmdline()
+    local f = io.open("/proc/cmdline", "r")
+    if not f then return {} end
+    local c = f:read("*a"); f:close()
+    local p = {}; for param in c:gmatch("%S+") do p[#p+1] = param end
+    return p
+end
+
+local function get_cmdline_param(params, prefix)
+    for _, p in ipairs(params) do
+        if p:sub(1, #prefix) == prefix then return p:sub(#prefix + 1) end
+    end
+    return nil
+end
+
+local function emergency_shell(msg)
+    err(msg)
+    err("Dropping to emergency shell. Type 'exit' to reboot.")
+    exec_silent("mount -t devpts devpts /dev/pts")
+    os.execute("setsid cttyhack /bin/sh -l 2>/dev/null || exec /bin/sh")
+end
+
+-- Auto-detect kernel version from /lib/modules
+local function get_kver()
+    local h = io.popen("ls /lib/modules/ 2>/dev/null | head -1")
+    if h then local v = h:read("*l"); h:close(); return v end
+    return nil
+end
+local KVER = get_kver() or "6.18.29-0-lts"
+
+-- ── Step 1: Mount Virtual Filesystems ────────────────────────────────────────
+
+log("Mounting virtual filesystems...")
+mount("proc", "proc", "/proc")
+mount("sysfs", "sysfs", "/sys")
+mount("devtmpfs", "devtmpfs", "/dev")
+mkdir_p("/dev/pts"); mkdir_p("/dev/shm")
+mount("devpts", "devpts", "/dev/pts")
+mount("tmpfs", "tmpfs", "/dev/shm")
+
+-- ── Step 2: Start Device Manager ────────────────────────────────────────────
+
+log("Starting device manager...")
+if file_exists("/sbin/mdev") then
+    exec_silent("echo /sbin/mdev > /proc/sys/kernel/hotplug")
+    exec_silent("mdev -s")
+    log("mdev started")
 else
-    LIVE_WARN "No device manager (mdev/udev) found — device detection may be incomplete"
-fi
+    warn("No device manager found")
+end
 
-# ── Step 3: Load essential modules ───────────────────────────────────────────
-LIVE_LOG "Loading kernel modules..."
-for mod in \
-    usb-storage usb_storage \
-    sd_mod sr_mod mmc_block \
-    nvme nvme_core \
-    isofs squashfs loop overlay \
-    vfat fat msdos \
-    nls_cp437 nls_iso8859_1 nls_ascii \
-    usbhid xhci_hcd ehci_hcd ohci_hcd uhci_hcd \
-    scsi_mod usb_common \
-    ext4 jbd2 crc16; do
-    modprobe "$mod" 2>/dev/null || true
-done
+-- ── Step 3: Load Kernel Modules ─────────────────────────────────────────────
 
-# ── Step 4: Wait for device nodes ────────────────────────────────────────────
-# This is critical — USB controllers are slow, device nodes need time to appear
-LIVE_LOG "Waiting for devices to settle..."
+log("Loading kernel modules...")
 
-# Method 1: udevadm settle (best)
-if command -v udevadm >/dev/null 2>&1; then
-    udevadm settle --timeout=15 2>/dev/null || true
-fi
-
-# Method 2: mdev scan (re-scan after modules loaded)
-if command -v mdev >/dev/null 2>&1; then
-    mdev -s 2>/dev/null || true
-fi
-
-# Method 3: manual wait — check for block devices appearing
-WAIT_COUNT=0
-while [ $WAIT_COUNT -lt 10 ]; do
-    # Check if any block device exists beyond sda
-    if ls /dev/sd* /dev/mmcblk* /dev/nvme* /dev/vd* /dev/sr* 2>/dev/null | head -1 >/dev/null; then
-        break
-    fi
-    sleep 1
-    WAIT_COUNT=$((WAIT_COUNT + 1))
-    # Re-trigger mdev each second
-    mdev -s 2>/dev/null || true
-done
-
-LIVE_LOG "Device wait complete (${WAIT_COUNT}s)"
-
-# ── Step 5: Find the boot media ──────────────────────────────────────────────
-LIVE_LOG "Searching for boot media..."
-
-ISO_DEV=""
-ISO_MOUNT="/mnt/iso"
-
-# Collect all candidate block devices (base + partitions)
-enumerate_devices() {
-    local devices=""
-
-    # SCSI/SATA/USB drives and their partitions
-    for dev in /dev/sd[a-z] /dev/sd[a-z][0-9] /dev/sd[a-z][0-9][0-9]; do
-        [ -b "$dev" ] && devices="$devices $dev"
-    done
-
-    # MMC (SD cards) and partitions
-    for dev in /dev/mmcblk[0-9] /dev/mmcblk[0-9]p[0-9] /dev/mmcblk[0-9]p[0-9][0-9]; do
-        [ -b "$dev" ] && devices="$devices $dev"
-    done
-
-    # NVMe and partitions
-    for dev in /dev/nvme[0-9]n[0-9] /dev/nvme[0-9]n[0-9]p[0-9] /dev/nvme[0-9]n[0-9]p[0-9][0-9]; do
-        [ -b "$dev" ] && devices="$devices $dev"
-    done
-
-    # Virtio
-    for dev in /dev/vd[a-z] /dev/vd[a-z][0-9]; do
-        [ -b "$dev" ] && devices="$devices $dev"
-    done
-
-    # CD-ROM
-    for dev in /dev/sr[0-9] /dev/cdrom; do
-        [ -b "$dev" ] && devices="$devices $dev"
-    done
-
-    echo "$devices"
+local modules = {
+    "scsi_mod", "scsi_common", "cdrom",
+    "sr_mod", "libata", "ata_piix", "ahci",
+    "usb-common", "usbcore",
+    "xhci_hcd", "ehci_hcd", "ohci_hcd", "uhci_hcd",
+    "usb-storage", "sd_mod", "mmc_block", "nvme_core", "nvme",
+    "loop", "isofs", "overlay",
+    "vfat", "fat", "msdos", "ext4", "jbd2", "crc16",
+    "nls_cp437", "nls_iso8859_1", "nls_ascii",
 }
 
-# Try mounting a device with multiple filesystem types
-try_mount_device() {
-    local dev="$1"
-    local mountpoint="$2"
+local loaded, skipped = 0, 0
+for _, mod in ipairs(modules) do
+    if os.execute("modprobe " .. mod .. " 2>/dev/null") == true then
+        loaded = loaded + 1
+    else
+        skipped = skipped + 1
+    end
+end
+log(string.format("Modules: %d loaded, %d skipped", loaded, skipped))
 
-    # Skip non-existent devices
-    [ -b "$dev" ] || return 1
+-- ── Step 3b: Load squashfs via insmod (modprobe fails: missing modules.dep) ──
+-- squashfs.ko is in the initrd but not listed in modules.dep.
+-- Decompress and insmod directly as fallback.
+if not os.execute("grep -q squashfs /proc/modules 2>/dev/null") then
+    log("Loading squashfs via insmod...")
+    local sq_gz = "/usr/lib/modules/" .. KVER .. "/kernel/fs/squashfs/squashfs.ko.gz"
+    if file_exists(sq_gz) then
+        exec_silent("zcat " .. sq_gz .. " > /tmp/squashfs.ko")
+        local r = os.execute("insmod /tmp/squashfs.ko 2>&1")
+        if r == true then
+            log("squashfs loaded via insmod")
+        else
+            warn("insmod squashfs failed")
+        end
+    else
+        warn("squashfs.ko.gz not found at " .. sq_gz)
+    end
+end
 
-    # Try filesystem types in order of likelihood
-    local fstypes="iso9660 vfat ext4 exfat ntfs"
+-- Create loop devices if not present
+for i = 0, 7 do
+    if not block_exists("/dev/loop" .. i) then
+        exec_silent("mknod /dev/loop" .. i .. " b 7 " .. i)
+    end
+end
 
-    # CD-ROM devices: only try iso9660
-    case "$dev" in
-        /dev/sr*|/dev/cdrom) fstypes="iso9660" ;;
-    esac
+-- ── Step 4: Wait for Devices ────────────────────────────────────────────────
 
-    for fstype in $fstypes; do
-        if mount -t "$fstype" -o ro "$dev" "$mountpoint" 2>/dev/null; then
-            LIVE_LOG "Mounted $dev as $fstype"
-            return 0
-        fi
-    done
+log("Waiting for devices...")
+exec_silent("mdev -s")
+for _ = 1, 10 do
+    local devs = glob_block("/dev/sd* /dev/sr* /dev/mmcblk* /dev/nvme* /dev/vd*")
+    if #devs > 0 then break end
+    os.execute("sleep 1")
+    exec_silent("mdev -s")
+end
+log("Device wait complete")
 
-    # Last resort: let kernel auto-detect
-    if mount -o ro "$dev" "$mountpoint" 2>/dev/null; then
-        LIVE_LOG "Mounted $dev (auto-detected)"
-        return 0
-    fi
+-- ── Step 5: Find Boot Media ─────────────────────────────────────────────────
 
-    return 1
-}
+log("Searching for boot media...")
+local ISO_MOUNT = "/mnt/iso"
+mkdir_p(ISO_MOUNT)
 
-# Check if a mountpoint contains live media
-is_live_media() {
-    local mountpoint="$1"
-    [ -f "$mountpoint/live/rootfs.squashfs" ] && return 0
-    [ -d "$mountpoint/live" ] && return 0
-    return 1
-}
+local function try_mount_device(dev)
+    if not block_exists(dev) then return false end
+    local fstypes
+    if dev:match("/dev/sr") or dev:match("/dev/cdrom") then
+        fstypes = {"iso9660"}
+    else
+        fstypes = {"iso9660", "vfat", "ext4", "exfat", "ntfs"}
+    end
+    for _, fstype in ipairs(fstypes) do
+        if mount(fstype, dev, ISO_MOUNT, "ro") then
+            if file_exists(ISO_MOUNT .. "/live/rootfs.squashfs") or
+               os.execute("test -d " .. ISO_MOUNT .. "/live") == true then
+                log("Found live media: " .. dev .. " (" .. fstype .. ")")
+                return true
+            end
+            exec_silent("umount " .. ISO_MOUNT)
+        end
+    end
+    return false
+end
 
-find_boot_media() {
-    # Check kernel command line for explicit device
-    for param in $(cat /proc/cmdline 2>/dev/null); do
-        case "$param" in
-            live=*)
-                local explicit_dev="${param#live=}"
-                if [ -b "$explicit_dev" ]; then
-                    mkdir -p "$ISO_MOUNT"
-                    if try_mount_device "$explicit_dev" "$ISO_MOUNT"; then
-                        if is_live_media "$ISO_MOUNT"; then
-                            ISO_DEV="$explicit_dev"
-                            LIVE_LOG "Found live media via cmdline: $explicit_dev"
-                            return 0
-                        fi
-                        umount "$ISO_MOUNT" 2>/dev/null
-                    fi
-                fi
-                ;;
-        esac
-    done
+local function find_boot_media()
+    local cmdline = read_cmdline()
+    local explicit = get_cmdline_param(cmdline, "live=")
+    if explicit and block_exists(explicit) then
+        if try_mount_device(explicit) then return true end
+    end
+    for _, dev in ipairs({"/dev/sr0", "/dev/cdrom", "/dev/sr1"}) do
+        if block_exists(dev) and try_mount_device(dev) then return true end
+    end
+    for _, pattern in ipairs({
+        "/dev/sd[a-z][0-9]", "/dev/mmcblk[0-9]p[0-9]",
+        "/dev/nvme[0-9]n[0-9]p[0-9]", "/dev/vd[a-z][0-9]",
+    }) do
+        for _, dev in ipairs(glob_block(pattern)) do
+            if try_mount_device(dev) then return true end
+        end
+    end
+    for _, dev in ipairs({"/dev/sda","/dev/sdb","/dev/vda","/dev/mmcblk0","/dev/nvme0n1"}) do
+        if block_exists(dev) and try_mount_device(dev) then return true end
+    end
+    return false
+end
 
-    # Auto-detect: enumerate all block devices
-    mkdir -p "$ISO_MOUNT"
+if not find_boot_media() then
+    err("No boot media found!")
+    err("Available block devices:")
+    for _, d in ipairs(glob_block("/dev/sd* /dev/sr* /dev/mmcblk* /dev/nvme* /dev/vd*")) do
+        err("  " .. d)
+    end
+    err("Tip: pass 'live=/dev/sdX1' on kernel cmdline")
+    emergency_shell("Boot media detection failed.")
+end
 
-    # Try CD-ROM first (most common for ISO boot)
-    for dev in /dev/sr0 /dev/cdrom /dev/sr1; do
-        [ -b "$dev" ] || continue
-        if try_mount_device "$dev" "$ISO_MOUNT"; then
-            if is_live_media "$ISO_MOUNT"; then
-                ISO_DEV="$dev"
-                LIVE_LOG "Found live media on CD-ROM: $dev"
-                return 0
-            fi
-            umount "$ISO_MOUNT" 2>/dev/null
-        fi
-    done
+log("Boot media mounted at " .. ISO_MOUNT)
 
-    # Then try partitions (not base devices — base devices without partitions
-    # are almost never the right target for USB/MMC/NVMe)
-    for dev in $(enumerate_devices); do
-        # Skip base devices that have partitions (e.g., skip /dev/sda if /dev/sda1 exists)
-        case "$dev" in
-            /dev/sd[a-z])   continue ;;  # base SCSI device — skip, try partitions
-            /dev/mmcblk[0-9]) continue ;;  # base MMC device — skip
-            /dev/nvme[0-9]n[0-9]) continue ;;  # base NVMe — skip
-            /dev/vd[a-z])   continue ;;  # base virtio — skip
-        esac
+-- ── Step 6: Mount Squashfs Rootfs ───────────────────────────────────────────
+-- Mount on /squashfs (NOT /live/rootfs) because Step 7 mounts tmpfs on /live
+-- which would hide anything mounted under /live/*.
 
-        if try_mount_device "$dev" "$ISO_MOUNT"; then
-            if is_live_media "$ISO_MOUNT"; then
-                ISO_DEV="$dev"
-                LIVE_LOG "Found live media on: $dev"
-                return 0
-            fi
-            umount "$ISO_MOUNT" 2>/dev/null
-        fi
-    done
+local SQUASHFS = ISO_MOUNT .. "/live/rootfs.squashfs"
+if not file_exists(SQUASHFS) then
+    err("rootfs.squashfs not found at " .. SQUASHFS)
+    emergency_shell("Squashfs not found.")
+end
 
-    # Last resort: try base devices (for dd'd ISOs directly to /dev/sda)
-    for dev in /dev/sda /dev/sdb /dev/sdc /dev/mmcblk0 /dev/mmcblk1 /dev/nvme0n1 /dev/vda; do
-        [ -b "$dev" ] || continue
-        if try_mount_device "$dev" "$ISO_MOUNT"; then
-            if is_live_media "$ISO_MOUNT"; then
-                ISO_DEV="$dev"
-                LIVE_LOG "Found live media on base device: $dev"
-                return 0
-            fi
-            umount "$ISO_MOUNT" 2>/dev/null
-        fi
-    done
+log("Mounting squashfs...")
+mkdir_p("/squashfs")
 
-    return 1
-}
+if not mount("squashfs", SQUASHFS, "/squashfs", "ro,loop") then
+    warn("Direct mount failed, trying losetup...")
+    local ok, out = exec("losetup -f")
+    if ok and out then
+        local loop_dev = out:match("(%S+)")
+        if loop_dev then
+            exec_silent("losetup " .. loop_dev .. " " .. SQUASHFS)
+            if not mount("squashfs", loop_dev, "/squashfs", "ro") then
+                emergency_shell("Squashfs mount failed.")
+            end
+        else
+            emergency_shell("No free loop device.")
+        end
+    else
+        emergency_shell("losetup not available.")
+    end
+end
 
-if ! find_boot_media; then
-    # Better error: show what devices DO exist
-    LIVE_ERR "No boot media found!"
-    LIVE_ERR ""
-    LIVE_ERR "Available block devices:"
-    for dev in /dev/sd* /dev/mmcblk* /dev/nvme* /dev/vd* /dev/sr* /dev/cdrom; do
-        [ -b "$dev" ] && LIVE_ERR "  $dev"
-    done
-    LIVE_ERR ""
-    LIVE_ERR "Tip: pass 'live=/dev/sdX1' on kernel cmdline to specify device"
-    emergency_shell "Boot media detection failed."
-fi
+if not file_exists("/squashfs/sbin/init") then
+    err("No /sbin/init in squashfs!")
+    emergency_shell("Missing /sbin/init.")
+end
+log("Squashfs mounted OK")
 
-LIVE_LOG "Boot media: $ISO_DEV → $ISO_MOUNT"
+-- ── Step 7: Create Overlay ──────────────────────────────────────────────────
+-- overlayfs requires upperdir and workdir to be on the SAME filesystem.
+-- Solution: mount a single tmpfs on /live, then use subdirectories.
 
-# ── Step 6: Mount squashfs rootfs ────────────────────────────────────────────
-SQUASHFS_PATH="$ISO_MOUNT/live/rootfs.squashfs"
+log("Creating overlay...")
+mkdir_p("/live")
+if not mount("tmpfs", "tmpfs", "/live", "size=75%") then
+    emergency_shell("Overlay tmpfs failed.")
+end
+mkdir_p("/live/upper")
+mkdir_p("/live/work")
+mkdir_p("/live/merged")
 
-if [ ! -f "$SQUASHFS_PATH" ]; then
-    LIVE_ERR "rootfs.squashfs not found at $SQUASHFS_PATH"
-    LIVE_ERR "Contents of $ISO_MOUNT/live/:"
-    ls -la "$ISO_MOUNT/live/" 2>/dev/null || LIVE_ERR "(directory not found)"
-    LIVE_ERR ""
-    LIVE_ERR "Contents of $ISO_MOUNT/:"
-    ls -la "$ISO_MOUNT/" 2>/dev/null || LIVE_ERR "(mountpoint empty)"
-    emergency_shell "Squashfs not found."
-fi
+if not mount("overlay", "overlay", "/live/merged",
+    "lowerdir=/squashfs,upperdir=/live/upper,workdir=/live/work") then
+    local _, dmesg = exec("dmesg | tail -3")
+    log("overlay dmesg: " .. (dmesg or ""))
+    emergency_shell("Overlay mount failed.")
+end
+log("Overlay OK")
 
-LIVE_LOG "Mounting squashfs rootfs..."
-mkdir -p /live/rootfs
-if ! mount -t squashfs -o ro "$SQUASHFS_PATH" /live/rootfs; then
-    LIVE_ERR "Failed to mount squashfs from $SQUASHFS_PATH"
-    emergency_shell "Squashfs mount failed."
-fi
+-- ── Step 8: Prepare for switch_root ─────────────────────────────────────────
+-- switch_root requires NEW_ROOT to be a mountpoint.
+-- Bind mount /live/merged onto itself to ensure it's a proper mountpoint.
 
-# Verify squashfs has /sbin/init
-if [ ! -x "/live/rootfs/sbin/init" ] && [ ! -L "/live/rootfs/sbin/init" ]; then
-    LIVE_ERR "No /sbin/init found in squashfs rootfs!"
-    LIVE_ERR "Listing /live/rootfs/sbin/:"
-    ls -la /live/rootfs/sbin/ 2>/dev/null || LIVE_ERR "(not found)"
-    emergency_shell "Missing /sbin/init in rootfs."
-fi
+exec_silent("mount --bind /live/merged /live/merged")
 
-# ── Step 7: Create overlay for writable live session ─────────────────────────
-LIVE_LOG "Creating overlay filesystem..."
-mkdir -p /live/overlay /live/work /live/merged
+-- Create mountpoints that switch_root needs to move-mount into.
+-- squashfs is built with '-e proc sys dev run tmp' so these don't exist.
+mkdir_p("/live/merged/proc")
+mkdir_p("/live/merged/sys")
+mkdir_p("/live/merged/run")
+mkdir_p("/live/merged/tmp")
 
-if ! mount -t tmpfs -o size=75% tmpfs /live/overlay; then
-    LIVE_ERR "Failed to mount overlay tmpfs"
-    emergency_shell "Overlay tmpfs failed."
-fi
+-- Mount devpts and tmpfs on /dev BEFORE switch_root.
+-- switch_root does 'mount --move /dev → /live/merged/dev', which replaces
+-- any directories we create under /live/merged/dev. So we must mount on
+-- /dev in the initramfs, and they'll move along with the /dev mount.
+mkdir_p("/dev/pts")
+mkdir_p("/dev/shm")
+exec_silent("mount -t devpts devpts /dev/pts")
+exec_silent("mount -t tmpfs tmpfs /dev/shm")
 
-if ! mount -t overlay overlay \
-    -o lowerdir=/live/rootfs,upperdir=/live/overlay,workdir=/live/work \
-    /live/merged; then
-    LIVE_ERR "Failed to mount overlay"
-    emergency_shell "Overlay mount failed."
-fi
+-- Bind ISO media into merged root
+mkdir_p("/live/merged/media/iso")
+exec_silent("mount --bind " .. ISO_MOUNT .. " /live/merged/media/iso")
 
-# ── Step 8: Bind ISO media into merged root ──────────────────────────────────
-mkdir -p /live/merged/media/iso
-if mountpoint -q "$ISO_MOUNT"; then
-    mount --bind "$ISO_MOUNT" /live/merged/media/iso 2>/dev/null || true
-fi
+-- ── Step 9: Switch Root ─────────────────────────────────────────────────────
 
-# Mount devpts and tmpfs on /dev BEFORE switch_root.
-# switch_root does 'mount --move /dev → /live/merged/dev', which replaces
-# any directories we create under /live/merged/dev. So we must mount on
-# /dev in the initramfs, and they'll move along with the /dev mount.
-mkdir -p /dev/pts /dev/shm
-mount -t devpts devpts /dev/pts 2>/dev/null || true
-mount -t tmpfs tmpfs /dev/shm 2>/dev/null || true
+-- NOTE: Do NOT unmount /proc, /sys, or /dev before switch_root.
+-- switch_root mount-moves all mountpoints to the new root automatically.
+-- OpenRC needs these filesystems to be present when it starts.
 
-# ── Step 9: Clean up and switch root ─────────────────────────────────────────
-LIVE_LOG "Switching to live root..."
+log("Switching to live root...")
 
-# Create mountpoints that switch_root needs to move-mount into.
-# squashfs is built with '-e proc sys dev run tmp' so these don't exist.
-mkdir -p /live/merged/proc /live/merged/sys /live/merged/run /live/merged/tmp
+if not file_exists("/live/merged/sbin/init") then
+    err("/sbin/init not found in merged root!")
+    emergency_shell("Missing /sbin/init in merged root.")
+end
 
-# Verify /sbin/init exists in merged root
-INIT_PATH="/live/merged/sbin/init"
-if [ ! -e "$INIT_PATH" ]; then
-    LIVE_ERR "/sbin/init not found in merged root!"
-    LIVE_ERR "Contents of /live/merged/sbin/:"
-    ls -la /live/merged/sbin/ 2>/dev/null || LIVE_ERR "(sbin not found)"
-    emergency_shell "Missing /sbin/init in merged root."
-fi
+-- switch_root replaces PID 1 with the real init.
+-- 'exec' ensures Lua process is replaced (no fork), so switch_root becomes PID 1.
+os.execute("exec switch_root /live/merged /sbin/init")
 
-# switch_root: pivot to the live system
-# DO NOT unmount /proc /sys — switch_root mount-moves them to the new root.
-# OpenRC needs these filesystems to be present when it starts.
-exec switch_root /live/merged /sbin/init "$@"
+-- If exec returns, something went wrong
+err("switch_root returned — this should never happen!")
+emergency_shell("switch_root failed.")

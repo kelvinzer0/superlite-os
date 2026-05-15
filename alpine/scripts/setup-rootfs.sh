@@ -206,34 +206,25 @@ done
 
 # ── mkinitfs configuration ───────────────────────────────────────────────────
 echo "[setup] Configuring mkinitfs..."
-mkdir -p /etc/mkinitfs
+mkdir -p /etc/mkinitfs /etc/mkinitfs/features.d
+
 if [ -f /tmp/hooks/mkinitfs-superlite.conf ]; then
     cp /tmp/hooks/mkinitfs-superlite.conf /etc/mkinitfs/superlite.conf
 fi
 
-# Install the live-boot hook into mkinitfs features
-mkdir -p /etc/mkinitfs/features.d
-if [ -f /tmp/hooks/live-boot ]; then
-    cp /tmp/hooks/live-boot /etc/mkinitfs/features.d/superlite-live
+# Install mkinitfs feature hook (includes modules + binaries + Lua init)
+if [ -f /tmp/hooks/superlite-live ]; then
+    cp /tmp/hooks/superlite-live /etc/mkinitfs/features.d/superlite-live
     chmod +x /etc/mkinitfs/features.d/superlite-live
 fi
 
-# Install the live init script for use by initramfs
+# Install the Lua live init script
 if [ -f /tmp/hooks/superlite-live.init ]; then
-    cp /tmp/hooks/superlite-live.init /etc/mkinitfs/superlite-live.init
-    chmod +x /etc/mkinitfs/superlite-live.init
+    cp /tmp/hooks/superlite-live.init /tmp/hooks/superlite-live.init
 fi
 
-# Regenerate initramfs with live-boot support
+# Regenerate initramfs (feature hook injects Lua init as /init + modules + binaries)
 echo "[setup] Regenerating initramfs..."
-
-# First, patch Alpine's init script for live-boot support
-if [ -f /tmp/hooks/patch-init.sh ]; then
-    echo "[setup] Patching Alpine init for live-boot..."
-    chmod +x /tmp/hooks/patch-init.sh
-    sh /tmp/hooks/patch-init.sh 2>&1 || echo "[setup] WARNING: init patch had issues (non-fatal)"
-fi
-
 KVER=$(ls /lib/modules/ 2>/dev/null | head -1 || echo "lts")
 if [ -n "$KVER" ] && [ -d "/lib/modules/$KVER" ]; then
     mkinitfs -o /boot/initramfs-lts "$KVER" 2>&1 | tail -3 || \

@@ -55,14 +55,9 @@ for luabin in /usr/bin/lua5.4 /usr/bin/lua; do
     fi
 done
 
-# Install Lua init script
-if [ -f /tmp/hooks/superlite-live.init.lua ]; then
-    install -D -m 0755 /tmp/hooks/superlite-live.init.lua "${DESTDIR:-/}/init.lua"
-fi
-
-# Fallback: shell init
+# ── Install Lua live-boot init as /init ──────────────────────────────────────
 if [ -f /tmp/hooks/superlite-live.init ]; then
-    install -D -m 0755 /tmp/hooks/superlite-live.init "${DESTDIR:-/}/init.sh"
+    install -D -m 0755 /tmp/hooks/superlite-live.init "${DESTDIR:-/}/init"
 fi
 
 # Ensure /bin/sh
