@@ -40,7 +40,7 @@ done
 
 echo ""
 echo "Custom Recipes:"
-for recipe in labwc waybar foot tofi; do
+for recipe in labwc waybar tofi; do
     [ -f "${LAYER}/recipes-graphics/${recipe}/${recipe}.bb" ] && \
         pass "${recipe} recipe" || fail "${recipe} recipe missing"
 done
