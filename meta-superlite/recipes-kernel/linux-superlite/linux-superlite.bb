@@ -14,7 +14,7 @@ inherit kernel
 LINUX_VERSION = "6.12.28"
 LINUX_VERSION_EXTENSION = "-superlite"
 
-SRC_URI = "git://git.yoctoproject.org/linux-yocto.git;protocol=https;branch=6.12;name=machine \
+SRC_URI = "git://git.yoctoproject.org/linux-yocto.git;protocol=https;branch=v6.12/standard/base;name=machine \
            git://git.yoctoproject.org/yocto-kernel-cache;protocol=https;type=kmeta;name=meta;branch=yocto-6.12;destsuffix=kernel-meta"
 
 SRCREV_machine = "${AUTOREV}"
