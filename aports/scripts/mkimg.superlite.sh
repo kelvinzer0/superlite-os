@@ -9,6 +9,7 @@ profile_superlite() {
     kernel_cmdline="unionfs_size=512M console=tty0 console=ttyS0,115200"
     initfs_cmdline="modules=loop,squashfs,sd-mod,usb-storage,iso9660,vfat,nls_cp437,nls_iso8859_1 quiet"
     syslinux_serial="0 115200"
+    modloop_sign=no
 
     apks="$apks
         alpine-base openrc busybox busybox-suid busybox-static busybox-extras kmod
