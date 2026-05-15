@@ -88,13 +88,8 @@ setup_poky() {
             https://git.openembedded.org/meta-openembedded "${layers_dir}/meta-openembedded"
     fi
 
-    # meta-alpine (for musl/Alpine packages — optional)
-    if [[ ! -d "${layers_dir}/meta-alpine" ]]; then
-        log_info "Cloning meta-alpine (optional, for musl support)..."
-        git clone --depth 1 \
-            https://github.com/agherzan/meta-alpine.git "${layers_dir}/meta-alpine" 2>/dev/null || \
-            log_warn "meta-alpine not available — using glibc fallback"
-    fi
+    # meta-alpine doesn't exist — musl support is native in OE-Core via TCLIBC = "musl"
+    # No extra layer needed.
 }
 
 # ── Configure build ────────────────────────────────────────────────────────
@@ -125,10 +120,8 @@ BBLAYERS = " \\
 "
 EOF
 
-    # Add meta-alpine if available
-    if [[ -d "${BUILD_DIR}/meta-alpine" ]]; then
-        sed -i '/meta-multimedia/a\  ${TOPDIR}/meta-alpine \\' "${conf_dir}/bblayers.conf"
-    fi
+    # Musl support: uncomment TCLIBC = "musl" in local.conf if needed.
+    # No extra layer required — OE-Core supports musl natively.
 
     # local.conf
     cat > "${conf_dir}/local.conf" << EOF
