@@ -50,7 +50,8 @@ if [[ "$USE_DOCKER" == true ]]; then
             apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
                 busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
                 grub-efi grub-bios lua5.4 git &&
-            adduser -D build -G abuild &&
+            adduser -D build &&
+            addgroup build abuild 2>/dev/null || true &&
             echo 'build:build' | chpasswd &&
             echo 'build ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers &&
             git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports &&
