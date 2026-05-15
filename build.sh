@@ -1,268 +1,138 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # ============================================================================
-# SuperLite OS — Yocto Build Script
-# Initializes Poky/OE-Core and builds the SuperLite OS image
+# SuperLite OS — Build Script (Alpine Native)
+# ============================================================================
+# Replaces Yocto entirely. Uses Alpine's mkimage.sh — simple, fast, reliable.
 #
-# Usage: ./build.sh [OPTIONS]
-#   --setup-only    Only set up the Yocto environment, don't build
-#   --clean         Clean build artifacts before building
-#   --bitbake-args  Extra args passed to bitbake
-#   --help          Show help
+# Usage:
+#   ./build.sh                    # Build ISO (requires root or Docker)
+#   ./build.sh --setup-only       # Just set up the build environment
+#   ./build.sh --docker           # Build inside Docker container
+#   ./build.sh --output /path     # Custom output path
+#
+# Requirements: Alpine Linux (or Docker)
 # ============================================================================
-
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_DIR="${SCRIPT_DIR}/build"
-POKY_DIR="${BUILD_DIR}/poky"
-META_SUPERLITE="${SCRIPT_DIR}/meta-superlite"
-MACHINE="superlite-x86_64"
-DISTRO="superlite"
-IMAGE="superlite-os-image"
-
-# ── Colors ──────────────────────────────────────────────────────────────────
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
-log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
-log_step()  { echo -e "${BLUE}[STEP]${NC} $*"; }
-die()       { log_error "$@"; exit 1; }
-
-# ── Args ────────────────────────────────────────────────────────────────────
+APORTS_DIR="${SCRIPT_DIR}/aports"
+OUTPUT=""
 SETUP_ONLY=false
-CLEAN=false
-VERBOSE=false
-BITBAKE_ARGS=""
+USE_DOCKER=false
+TAG="superlite"
 
+# ── Parse args ────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --setup-only)   SETUP_ONLY=true; shift ;;
-        --clean)        CLEAN=true; shift ;;
-        --verbose)      VERBOSE=true; shift ;;
-        --bitbake-args) BITBAKE_ARGS="$2"; shift 2 ;;
-        --help)
-            head -15 "$0" | grep '^#' | sed 's/^# \?//'
+        --setup-only) SETUP_ONLY=true; shift ;;
+        --docker)     USE_DOCKER=true; shift ;;
+        --output)     OUTPUT="$2"; shift 2 ;;
+        --tag)        TAG="$2"; shift 2 ;;
+        -h|--help)
+            echo "Usage: $0 [--setup-only] [--docker] [--output PATH] [--tag NAME]"
             exit 0
             ;;
-        *) die "Unknown option: $1" ;;
+        *) echo "Unknown: $1"; exit 1 ;;
     esac
 done
 
-# ── Preflight ──────────────────────────────────────────────────────────────
-check_deps() {
-    local missing=()
-    for cmd in git python3 tar gzip diffstat chrpath cpio wget; do
-        command -v "$cmd" &>/dev/null || missing+=("$cmd")
-    done
-    [[ ${#missing[@]} -gt 0 ]] && die "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio python3 python3-pip python3-pexpect python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales libacl1"
+log() { echo "[build] $*"; }
 
-    # Check for xorriso (ISO generation)
-    command -v xorriso &>/dev/null || log_warn "xorriso not found — ISO generation will fail. Install: sudo apt install xorriso"
+# ── Docker build ──────────────────────────────────────────────────────────────
+if [[ "$USE_DOCKER" == true ]]; then
+    log "Building inside Docker..."
+    docker run --rm -it \
+        --privileged \
+        -v "${SCRIPT_DIR}:/build" \
+        -w /build \
+        alpine:edge \
+        sh -c "
+            apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
+                busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
+                grub-efi grub-bios lua5.4 git &&
+            adduser build -G abuild 2>/dev/null || true &&
+            git clone --depth=1 git://git.alpinelinux.org/aports /root/aports 2>/dev/null || true &&
+            cp /build/aports/scripts/mkimg.superlite.sh /root/aports/scripts/ &&
+            cp /build/aports/scripts/genapkovl-superlite.sh /root/aports/scripts/ &&
+            cd /root/aports/scripts &&
+            ./mkimage.sh \
+                --profile superlite \
+                --arch x86_64 \
+                --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
+                --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+                --outdir /build/output/ \
+                --tag ${TAG}
+        "
+    log "ISO built at: ${SCRIPT_DIR}/output/"
+    exit 0
+fi
 
-    # Check for squashfs-tools
-    command -v mksquashfs &>/dev/null || log_warn "squashfs-tools not found. Install: sudo apt install squashfs-tools"
+# ── Native build (must be on Alpine) ──────────────────────────────────────────
+if [[ ! -f /etc/alpine-release ]]; then
+    log "WARNING: Not running on Alpine. Use --docker for containerized build."
+    log "Or install Alpine build dependencies first."
+fi
 
-    # Check locale
-    locale -a 2>/dev/null | grep -qi "en_us.utf" || log_warn "en_US.UTF-8 locale not found — Yocto may fail. Run: sudo locale-gen en_US.UTF-8"
-}
+# ── Install dependencies ─────────────────────────────────────────────────────
+log "Installing build dependencies..."
+apk add --no-cache \
+    alpine-sdk build-base apk-tools alpine-conf \
+    busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
+    grub-efi grub-bios lua5.4 git 2>/dev/null || true
 
-# ── Setup Poky ─────────────────────────────────────────────────────────────
-setup_poky() {
-    log_step "Setting up Poky (Yocto reference build system)..."
+# ── Clone aports if needed ────────────────────────────────────────────────────
+if [[ ! -d /root/aports ]]; then
+    log "Cloning aports..."
+    git clone --depth=1 git://git.alpinelinux.org/aports /root/aports
+fi
 
-    mkdir -p "$BUILD_DIR"
+# ── Copy profile scripts ─────────────────────────────────────────────────────
+log "Installing SuperLite profile..."
+cp "${APORTS_DIR}/scripts/mkimg.superlite.sh"   /root/aports/scripts/
+cp "${APORTS_DIR}/scripts/genapkovl-superlite.sh" /root/aports/scripts/
+chmod +x /root/aports/scripts/genapkovl-superlite.sh
 
-    if [[ ! -d "$POKY_DIR" ]]; then
-        log_info "Cloning Poky (scarthgap branch)..."
-        git clone --depth 1 --branch scarthgap \
-            https://git.yoctoproject.org/poky "$POKY_DIR"
-    else
-        log_info "Poky already present at ${POKY_DIR}"
-    fi
+# ── Copy assets that genapkovl needs ──────────────────────────────────────────
+# genapkovl-superlite.sh references $SCRIPT_DIR/../../dotfiles
+# We need them accessible relative to the script in aports/scripts
+if [[ -d "${SCRIPT_DIR}/dotfiles" ]]; then
+    # Create a symlink so the script can find dotfiles
+    ln -sf "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles 2>/dev/null || \
+        cp -r "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles
+fi
 
-    # Clone required layers
-    local layers_dir="${POKY_DIR}/.."
+if [[ "$SETUP_ONLY" == true ]]; then
+    log "Setup complete. Build manually with:"
+    log "  cd /root/aports/scripts && ./mkimage.sh --profile superlite --arch x86_64 --outdir /root/iso/ --tag ${TAG}"
+    exit 0
+fi
 
-    # meta-openembedded (for additional packages)
-    if [[ ! -d "${layers_dir}/meta-openembedded" ]]; then
-        log_info "Cloning meta-openembedded..."
-        git clone --depth 1 --branch scarthgap \
-            https://git.openembedded.org/meta-openembedded "${layers_dir}/meta-openembedded"
-    fi
+# ── Build ISO ─────────────────────────────────────────────────────────────────
+log "Building SuperLite OS ISO..."
+ISO_OUT="${OUTPUT:-${SCRIPT_DIR}/output}"
+mkdir -p "$ISO_OUT"
 
-    # meta-wayland (for wlroots, wayland-protocols, etc.)
-    if [[ ! -d "${layers_dir}/meta-wayland" ]]; then
-        log_info "Cloning meta-wayland..."
-        git clone --depth 1 --branch scarthgap \
-            https://github.com/nicira/meta-wayland.git "${layers_dir}/meta-wayland" 2>/dev/null || \
-        git clone --depth 1 --branch master \
-            https://github.com/nicira/meta-wayland.git "${layers_dir}/meta-wayland" 2>/dev/null || \
-            log_warn "meta-wayland clone failed — wlroots recipes may be missing"
-    fi
+cd /root/aports/scripts
+./mkimage.sh \
+    --profile superlite \
+    --arch x86_64 \
+    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
+    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+    --outdir "$ISO_OUT" \
+    --tag "$TAG"
 
-    # meta-alpine doesn't exist — musl support is native in OE-Core via TCLIBC = "musl"
-    # No extra layer needed.
-}
-
-# ── Configure build ────────────────────────────────────────────────────────
-configure_build() {
-    log_step "Configuring Yocto build..."
-
-    local conf_dir="${BUILD_DIR}/conf"
-    mkdir -p "$conf_dir"
-
-    # bblayers.conf
-    cat > "${conf_dir}/bblayers.conf" << EOF
-# POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
-# changes incompatibly
-POKY_BBLAYERS_CONF_VERSION = "2"
-
-BBPATH = "\${TOPDIR}"
-BBFILES ?= ""
-
-BBLAYERS = " \\
-  ${POKY_DIR}/meta \\
-  ${POKY_DIR}/meta-poky \\
-  ${POKY_DIR}/meta-yocto-bsp \\
-  ${BUILD_DIR}/meta-openembedded/meta-oe \\
-  ${BUILD_DIR}/meta-openembedded/meta-python \\
-  ${BUILD_DIR}/meta-openembedded/meta-networking \\
-  ${BUILD_DIR}/meta-openembedded/meta-multimedia \\
-  ${META_SUPERLITE} \\
-"
-EOF
-
-    # Musl support: uncomment TCLIBC = "musl" in local.conf if needed.
-    # No extra layer required — OE-Core supports musl natively.
-
-    # local.conf — use quoted heredoc to avoid bash expanding BitBake/python vars
-    cat > "${conf_dir}/local.conf" << 'EOF'
-# SuperLite OS — Yocto Build Configuration
-
-MACHINE = "MACHINE_PLACEHOLDER"
-DISTRO = "DISTRO_PLACEHOLDER"
-
-# Package management
-PACKAGE_CLASSES = "package_ipk"
-
-# Parallel build
-BB_NUMBER_THREADS = "${@os.cpu_count()}"
-PARALLEL_MAKE = "-j ${@os.cpu_count()}"
-
-# Disk monitoring
-BB_DISKMON_DIRS = "\
-    STOPTASKS,${TMPDIR},1G,100K \
-    STOPTASKS,${DL_DIR},1G,100K \
-    STOPTASKS,${SSTATE_DIR},1G,100K \
-    ABORT,${TMPDIR},100M,1K \
-    ABORT,${DL_DIR},100M,1K \
-    ABORT,${SSTATE_DIR},100M,1K"
-
-# Download directory (shared across builds)
-DL_DIR = "${TOPDIR}/downloads"
-SSTATE_DIR = "${TOPDIR}/sstate-cache"
-
-# Image type
-IMAGE_FSTYPES = "squashfs-xz"
-
-# Security — accept commercial licenses for firmware
-LICENSE_FLAGS_ACCEPTED += "commercial"
-
-# Enable kernel build
-KERNEL_IMAGETYPE = "bzImage"
-
-# Extra space for live image
-IMAGE_ROOTFS_EXTRA_SPACE = "0"
-
-# Debug — keep working directory for debugging
-RM_WORK_EXCLUDE += "linux-superlite"
-
-# Preserve build history
-INHERIT += "buildhistory"
-BUILDHISTORY_COMMIT = "1"
-EOF
-
-    # Inject actual MACHINE and DISTRO values
-    sed -i "s|MACHINE_PLACEHOLDER|${MACHINE}|" "${conf_dir}/local.conf"
-    sed -i "s|DISTRO_PLACEHOLDER|${DISTRO}|" "${conf_dir}/local.conf"
-
-    log_info "Build configuration written to ${conf_dir}/"
-}
-
-# ── Build ──────────────────────────────────────────────────────────────────
-build_image() {
-    log_step "Initializing BitBake environment..."
-    cd "$POKY_DIR"
-
-    # oe-init-build-env only creates default conf if bblayers.conf doesn't exist.
-    # Our configure_build() already wrote it, so just source to set PATH/env vars.
-    set +u
-    source oe-init-build-env "$BUILD_DIR" > /dev/null 2>&1 || true
-    set -u
-
-    # Verify our layer is in bblayers.conf (not the Poky default)
-    if ! grep -q "meta-superlite" "${BUILD_DIR}/conf/bblayers.conf" 2>/dev/null; then
-        log_warn "bblayers.conf was overwritten by Poky default. Re-configuring..."
-        configure_build
-        cd "$POKY_DIR"
-        set +u
-        source oe-init-build-env "$BUILD_DIR" > /dev/null 2>&1 || true
-        set -u
-    fi
-
-    if [[ "$SETUP_ONLY" == true ]]; then
-        log_info "Setup complete. To build manually:"
-        log_info "  cd ${BUILD_DIR}"
-        log_info "  source ${POKY_DIR}/oe-init-build-env ${BUILD_DIR}"
-        log_info "  bitbake ${IMAGE}"
-        return 0
-    fi
-
-    log_step "Building ${IMAGE} (this will take a while)..."
-    set +u
-    bitbake ${IMAGE} ${BITBAKE_ARGS}
-    set -u
-
-    # Build ISO if image succeeded
-    log_step "Building bootable ISO..."
-    if command -v superlite-boot &>/dev/null; then
-        superlite-boot --build-dir "$BUILD_DIR" --output "${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
-    elif [[ -f "${META_SUPERLITE}/recipes-apps/superlite-live/superlite-live/superlite-boot.sh" ]]; then
-        bash "${META_SUPERLITE}/recipes-apps/superlite-live/superlite-live/superlite-boot.sh" \
-            --build-dir "$BUILD_DIR" \
-            --output "${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
-    else
-        log_warn "superlite-boot not found. Run it manually to create the ISO."
-    fi
-}
-
-# ── Main ───────────────────────────────────────────────────────────────────
-main() {
-    echo ""
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║     SuperLite OS — Yocto Build System        ║"
-    echo "║  Alpine Linux + LabWC Wayland Desktop        ║"
-    echo "╚══════════════════════════════════════════════╝"
-    echo ""
-
-    if [[ "$CLEAN" == true ]]; then
-        log_info "Cleaning build directory..."
-        rm -rf "$BUILD_DIR"/{tmp*,sstate-cache,cache}
-    fi
-
-    check_deps
-    setup_poky
-    configure_build
-    build_image
-
-    echo ""
-    log_info "═══════════════════════════════════════════════"
-    log_info "Build complete!"
-    log_info "ISO: ${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
-    log_info ""
-    log_info "Write to USB:"
-    log_info "  sudo dd if=superlite-os-*.iso of=/dev/sdX bs=4M status=progress"
-    log_info "═══════════════════════════════════════════════"
-}
-
-main "$@"
+# ── Done ──────────────────────────────────────────────────────────────────────
+ISO_FILE=$(find "$ISO_OUT" -name "*.iso" -type f | head -1)
+if [[ -n "$ISO_FILE" ]]; then
+    ISO_SIZE=$(du -sh "$ISO_FILE" | cut -f1)
+    log "═══════════════════════════════════════════════"
+    log "ISO created: $ISO_FILE"
+    log "Size: ${ISO_SIZE}"
+    log "Boot: UEFI + Legacy BIOS"
+    log "Rufus: Compatible (ISO + DD mode)"
+    log "Ventoy: Compatible"
+    log "═══════════════════════════════════════════════"
+else
+    log "ERROR: ISO not found in ${ISO_OUT}/"
+    exit 1
+fi

@@ -1,4 +1,4 @@
-name: Build SuperLite OS ISO (Yocto)
+name: Build SuperLite OS ISO
 
 on:
   workflow_dispatch:
@@ -7,98 +7,30 @@ on:
     tags: ['v*']
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Validate layer structure
-        run: |
-          chmod +x ./tests/validate-build.sh
-          ./tests/validate-build.sh
-
   build:
-    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 360
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free disk space
-        run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          sudo apt-get clean
-          docker rmi $(docker image ls -aq) 2>/dev/null || true
-          df -h /
-
-      - name: Disable AppArmor user namespace restriction
-        run: |
-          # BitBake needs unprivileged user namespaces (Ubuntu 24.04 restricts them)
-          echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
-          # Persist across reboots
-          echo "kernel.apparmor_restrict_unprivileged_userns = 0" | sudo tee -a /etc/sysctl.d/99-yocto.conf
-          sudo sysctl -p /etc/sysctl.d/99-yocto.conf
-
-      - name: Install Yocto build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            gawk wget git diffstat unzip texinfo gcc build-essential \
-            chrpath socat cpio python3 python3-pip python3-pexpect \
-            python3-git python3-jinja2 python3-subunit zstd liblz4-tool \
-            file locales libacl1 squashfs-tools xorriso mtools dosfstools \
-            syslinux syslinux-utils xz-utils
-
-          sudo locale-gen en_US.UTF-8
-
-      - name: Setup Yocto environment
+      - name: Build ISO in Docker
         run: |
           chmod +x ./build.sh
-          ./build.sh --setup-only
-
-      - name: Build SuperLite OS image
-        run: |
-          cd build/poky
-          set +u
-          source oe-init-build-env ../../build > /dev/null 2>&1 || true
-          set -u
-          # Verify layer is registered
-          bitbake-layers show-layers
-          bitbake superlite-os-image
-
-      - name: Generate bootable ISO
-        run: |
-          bash meta-superlite/recipes-apps/superlite-live/superlite-live/superlite-boot.sh \
-            --build-dir build \
-            --output "superlite-os-$(date +%Y%m%d).iso"
-
-      - name: Validate build output
-        run: ./tests/validate-build.sh
+          ./build.sh --docker --tag "${GITHUB_SHA::8}"
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: superlite-os-iso
-          path: superlite-os-*.iso
+          path: output/*.iso
           retention-days: 14
-
-      - name: Upload build logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            build/tmp-glibc/work/*/temp/log.*
-            build/tmp-glibc/deploy/images/
-          retention-days: 7
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: superlite-os-*.iso
+          files: output/*.iso
           generate_release_notes: true

@@ -1,15 +1,12 @@
 #!/bin/bash
 # ============================================================================
-# SuperLite OS — Build Validation (Yocto)
-# Validates Yocto build output without QEMU
+# SuperLite OS — Build Validation
+# Validates Alpine-native project structure
 # ============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="${TOP_DIR}/build"
-MACHINE="superlite-x86_64"
-IMG_DIR="${BUILD_DIR}/tmp-glibc/deploy/images/${MACHINE}"
 
 PASS=0
 FAIL=0
@@ -19,68 +16,55 @@ fail() { FAIL=$((FAIL + 1)); echo -e "  \033[0;31m✗\033[0m $*"; }
 
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "SuperLite OS — Build Validation"
+echo "SuperLite OS — Build Validation (Alpine Native)"
 echo "═══════════════════════════════════════════════"
 echo ""
 
-# ── Layer structure ─────────────────────────────────────────────────────────
-echo "Layer Structure:"
-LAYER="${TOP_DIR}/meta-superlite"
-[ -f "${LAYER}/conf/layer.conf" ] && pass "layer.conf exists" || fail "layer.conf missing"
-[ -f "${LAYER}/conf/machine/superlite-x86_64.conf" ] && pass "Machine config exists" || fail "Machine config missing"
-[ -f "${LAYER}/conf/distro/superlite.conf" ] && pass "Distro config exists" || fail "Distro config missing"
-[ -f "${LAYER}/recipes-core/images/superlite-os-image.bb" ] && pass "Image recipe exists" || fail "Image recipe missing"
-
-echo ""
-echo "Package Groups:"
-for pkg in base desktop network apps; do
-    [ -f "${LAYER}/recipes-core/packagegroups/packagegroup-superlite-${pkg}.bb" ] && \
-        pass "packagegroup-superlite-${pkg}" || fail "packagegroup-superlite-${pkg} missing"
-done
-
-echo ""
-echo "Custom Recipes:"
-for recipe in labwc waybar tofi; do
-    [ -f "${LAYER}/recipes-graphics/${recipe}/${recipe}.bb" ] && \
-        pass "${recipe} recipe" || fail "${recipe} recipe missing"
-done
-for recipe in superlite-live superlite-dotfiles superlite-hooks superlite-themes; do
-    [ -f "${LAYER}/recipes-apps/${recipe}/${recipe}.bb" ] && \
-        pass "${recipe} recipe" || fail "${recipe} recipe missing"
-done
-
-echo ""
-echo "Kernel:"
-[ -f "${LAYER}/recipes-kernel/linux-superlite/linux-superlite.bb" ] && pass "Kernel recipe" || fail "Kernel recipe missing"
-[ -f "${LAYER}/recipes-kernel/linux-superlite/linux-superlite/superlite.cfg" ] && pass "Base kernel config" || fail "Base kernel config missing"
-[ -f "${LAYER}/recipes-kernel/linux-superlite/linux-superlite/gpu.cfg" ] && pass "GPU kernel config" || fail "GPU kernel config missing"
-[ -f "${LAYER}/recipes-kernel/linux-superlite/linux-superlite/wifi.cfg" ] && pass "WiFi kernel config" || fail "WiFi kernel config missing"
-[ -f "${LAYER}/recipes-kernel/linux-superlite/linux-superlite/live-boot.cfg" ] && pass "Live-boot kernel config" || fail "Live-boot kernel config missing"
-
-echo ""
-echo "WIC:"
-[ -f "${LAYER}/wic/superlite-live.wks" ] && pass "WKS file" || fail "WKS file missing"
-
-# ── Build artifacts (if build exists) ──────────────────────────────────────
-if [ -d "$IMG_DIR" ]; then
-    echo ""
-    echo "Build Artifacts:"
-    ls "${IMG_DIR}/superlite-os-image-"*.squashfs-xz &>/dev/null && \
-        pass "Squashfs image found" || fail "No squashfs image"
-    ls "${IMG_DIR}/bzImage"* &>/dev/null && \
-        pass "Kernel image found" || fail "No kernel image"
-else
-    echo ""
-    echo "Build Artifacts: (no build found — run 'make build' first)"
-fi
-
-# ── Legacy files (backward compat) ────────────────────────────────────────
-echo ""
-echo "Legacy Scripts (backward compatibility):"
+# ── Core build files ───────────────────────────────────────────────────────
+echo "Core Build Files:"
 [ -f "${TOP_DIR}/build.sh" ] && pass "build.sh" || fail "build.sh missing"
-[ -f "${TOP_DIR}/Makefile" ] && pass "Makefile" || fail "Makefile missing"
-[ -d "${TOP_DIR}/alpine" ] && pass "alpine/ directory (legacy)" || fail "alpine/ directory missing"
-[ -d "${TOP_DIR}/dotfiles" ] && pass "dotfiles/ directory" || fail "dotfiles/ directory missing"
+[ -x "${TOP_DIR}/build.sh" ] && pass "build.sh is executable" || fail "build.sh not executable"
+[ -f "${TOP_DIR}/aports/scripts/mkimg.superlite.sh" ] && pass "mkimg.superlite.sh (profile)" || fail "mkimg.superlite.sh missing"
+[ -f "${TOP_DIR}/aports/scripts/genapkovl-superlite.sh" ] && pass "genapkovl-superlite.sh (overlay)" || fail "genapkovl-superlite.sh missing"
+
+echo ""
+echo "Package References:"
+[ -f "${TOP_DIR}/alpine/configs/packages.list" ] && pass "packages.list" || fail "packages.list missing"
+[ -f "${TOP_DIR}/alpine/configs/repositories" ] && pass "repositories" || fail "repositories missing"
+
+echo ""
+echo "Dotfiles:"
+[ -d "${TOP_DIR}/dotfiles/.config/labwc" ] && pass "LabWC config" || fail "LabWC config missing"
+[ -d "${TOP_DIR}/dotfiles/.config/waybar" ] && pass "Waybar config" || fail "Waybar config missing"
+[ -d "${TOP_DIR}/dotfiles/.config/foot" ] && pass "Foot config" || fail "Foot config missing"
+[ -d "${TOP_DIR}/dotfiles/.config/mako" ] && pass "Mako config" || fail "Mako config missing"
+[ -d "${TOP_DIR}/dotfiles/.config/tofi" ] && pass "Tofi config" || fail "Tofi config missing"
+
+echo ""
+echo "Themes:"
+[ -f "${TOP_DIR}/alpine/packages/themes/WhiteSur-Light.tar.xz" ] && pass "WhiteSur-Light theme" || fail "WhiteSur-Light missing"
+[ -f "${TOP_DIR}/alpine/packages/themes/Haiku.gz" ] && pass "Haiku icons" || fail "Haiku icons missing"
+[ -f "${TOP_DIR}/alpine/packages/themes/ohsnap.zip" ] && pass "OhSnap font" || fail "OhSnap font missing"
+
+echo ""
+echo "CI/CD:"
+[ -f "${TOP_DIR}/.github/workflows/build.yml" ] && pass "GitHub Actions workflow" || fail "build.yml missing"
+
+echo ""
+echo "NOT Yocto (verify clean removal):"
+[ ! -d "${TOP_DIR}/meta-superlite" ] && pass "meta-superlite removed" || fail "meta-superlite still exists!"
+
+# ── Build artifacts ────────────────────────────────────────────────────────
+echo ""
+ISO_COUNT=$(find "${TOP_DIR}/output" -name "*.iso" 2>/dev/null | wc -l)
+if [ "$ISO_COUNT" -gt 0 ]; then
+    echo "Build Artifacts:"
+    find "${TOP_DIR}/output" -name "*.iso" -exec ls -lh {} \; | while read line; do
+        pass "$line"
+    done
+else
+    echo "Build Artifacts: (none — run 'make docker' to build)"
+fi
 
 # ── Summary ────────────────────────────────────────────────────────────────
 echo ""
