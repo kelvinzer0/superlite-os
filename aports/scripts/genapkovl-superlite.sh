@@ -129,6 +129,20 @@ makefile root:root 0440 "$tmp"/etc/sudoers.d/live <<EOF
 live ALL=(ALL) NOPASSWD: ALL
 EOF
 
+# ── Copy dotfiles to skel + root ──────────────────────────────────────────────
+# NOTE: Dotfiles are copied FIRST, then overlay files below overwrite as needed
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DOTFILES_DIR="$SCRIPT_DIR/../../dotfiles"
+
+if [ -d "$DOTFILES_DIR" ]; then
+    mkdir -p "$tmp"/etc/skel
+    # Copy all dotfiles
+    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/etc/skel && tar -xf -)
+    # Also to root
+    mkdir -p "$tmp"/root
+    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/root && tar -xf -)
+fi
+
 # ── Shell profiles (Wayland env) ──────────────────────────────────────────────
 mkdir -p "$tmp"/etc/profile.d
 makefile root:root 0755 "$tmp"/etc/profile.d/xdg.sh <<'EOF'
@@ -141,7 +155,8 @@ export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
 EOF
 
-# ── LabWC auto-start for root ─────────────────────────────────────────────────
+# ── LabWC auto-start for root (AFTER dotfiles to prevent overwrite) ──────────
+# This MUST be the last file written to /root/ to ensure it's not overwritten
 mkdir -p "$tmp"/root
 makefile root:root 0644 "$tmp"/root/.profile <<'EOF'
 export XDG_RUNTIME_DIR="/tmp/$(id -u)-runtime-dir"
@@ -153,8 +168,12 @@ export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
 
+# Source aliases from dotfiles if available
+[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+
+# Auto-start LabWC on tty1
 if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec labwc
+    exec dbus-launch --exit-with-session labwc
 fi
 EOF
 
@@ -221,19 +240,6 @@ managed=false
 [device]
 wifi.backend=wpa_supplicant
 EOF
-
-# ── Copy dotfiles to skel + root ──────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DOTFILES_DIR="$SCRIPT_DIR/../../dotfiles"
-
-if [ -d "$DOTFILES_DIR" ]; then
-    mkdir -p "$tmp"/etc/skel
-    # Copy all dotfiles
-    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/etc/skel && tar -xf -)
-    # Also to root
-    mkdir -p "$tmp"/root
-    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/root && tar -xf -)
-fi
 
 # ── Generate apkovl ───────────────────────────────────────────────────────────
 tar -c -C "$tmp" etc root | gzip -9n > "$HOSTNAME.apkovl.tar.gz"
