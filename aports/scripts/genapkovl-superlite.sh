@@ -13,9 +13,7 @@ if [ -z "$HOSTNAME" ]; then
 fi
 
 cleanup() { 
-    rm -rf "$tmp"; 
-    rm -rf "$tmp"/usr/share/doc;
-    rm -rf "$tmp"/usr/share/man;
+    rm -rf "$tmp";
 }
 
 makefile() {
@@ -69,6 +67,7 @@ foot
 mesa-dri-gallium
 seatd
 dbus
+dbus-x11
 waybar
 swaybg
 swayidle
