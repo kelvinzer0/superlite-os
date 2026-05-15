@@ -1,20 +1,17 @@
-
 * {
     /* `otf-font-awesome` is required to be installed for icons */
-    font-family: Misc Ohsnap, Font Awesome;
-    font-size: 9px; 
-    margin-top: 1px;
-    font-weight: bold;
-
+    font-family: Misc Ohsnap, "Misc Ohsnap.Icons";
+    font-size: 14px; 
+    padding:0;
+    margin:0;
 }
 
 window#waybar {
     /* background-color: #e4e4de; */
-    background-color: transparent;
-    /* border-top: 1px solid #111;   */
-    /* border-left: 1px solid #111;  */
-    border-bottom: none;
-    color: #000000;
+    background-color: #000;
+    /* border-top: 1px solid #FFFFFF; */
+    border: none;
+    color: #FFF;
 }
 
 window#waybar.hidden {
@@ -36,13 +33,9 @@ button {
     /* Avoid rounded borders under each button name */
     border: none;
     border-radius: 0;
+    padding: 0;
 }
 
-/* https://github.com/Alexays/Waybar/wiki/FAQ#the-workspace-buttons-have-a-strange-hover-effect */
-button:hover {
-    background: inherit;
-    box-shadow: none;
-}
 
 /* #battery, */
 /* #cpu, */
@@ -62,52 +55,59 @@ button:hover {
     /* padding: 0; */
     /* color: #000000; */
 /* } */
+/*  */
 
-/* #window, */
-/* #workspaces { */
-/*     margin: 0 4px; */
-/* } */
+#clock {
+	padding-bottom: 2px;
+	font-weight: bold;
+}
+
+#bluetooth, #idle_inhibitor {
+	margin-bottom: 20px;
+}
 
 #taskbar {
-	padding-top: 0;
-	margin: 0;
+	margin-top: 30px;
 }
-
-
 #taskbar button {
-	/* margin-right: 20px; */
-	background-color: #FFFACD;
-	margin-right: 2px;
-	color: black; 
-	padding: 0 0 0 9px;
-	border: 1px solid black;
+	border: 1px solid gray;
+	padding: 6px 0 0 0;
+	background: lightgray;
+	margin-bottom: 2px;
 }
 
-#taskbar button.active {
-	background-color: #22AA99;
-	color: black
-}
-
+/* #taskbar button { */
+	/* padding: 0 6px; */
+/* } */
+/*  */
+ #taskbar button.active { 
+	background: #fff;
+ } 
+/*  */
+/* #taskbar button.minimized { */
+	 /* color: grey; */
+ /* } */
 
 /* If workspaces is the leftmost module, omit left margin */
-.modules-left {
-	margin:0;
-	padding:0
-}
+ .modules-left { 
+     margin: 20px 20px 0 20px;   
+ } 
+ .modules-right { 
+     margin: 0 20px 20px 20px;   
+ } 
 
-.modules-right {
-    padding: 0 10px 0 15px;
-    background-color: #fffacd;
-	border: 1px solid black;
 
-}
+/* .modules-right { */ 
+    /* margin-right: 20px; */ 
+    /* margin-bottom: 20px; */ 
+/* } */ 
 
 /* #custom-wpNext { */
 /* margin-left: 5px */
 /* } */
 
 /* #battery { */
-/* rotate: 90; */
+    /* color: #000000; */
 /* } */
 
 /* #battery.charging, #battery.plugged { */
@@ -136,31 +136,37 @@ label:focus {
     background-color: #000000;
 }
 
-
-/* #cpu { */
-/*     background-color: #2ecc71; */
-/*     color: #000000; */
-/* } */
-/*  */
-/* #memory { */
-/*     background-color: #9b59b6; */
-/* } */
-/*  */
-/* #disk { */
-/*     background-color: #964B00; */
-/* } */
-/*  */
-/* #backlight { */
-/*     background-color: #90b1b1; */
-/* } */
-
-#clock {
-    margin-right: 5px;
+#cpu {
+    background-color: #2ecc71;
+    color: #000000;
 }
 
-#network.disconnected, #network.disabled {
-    color: gray;
-}
+/* #battery { */
+    /* background-color: #9b59b6; */
+/* } */
+/*  */
+/* #bluetooth { */
+    /* background-color: #964B00; */
+/* } */
+/*  */
+/* #network { */
+    /* background-color: #90b1b1; */
+    /* margin-bottom: 10px; */
+/* } */
+
+/* #bluetooth, #battery, #network { */
+    /* background-color: #000; */
+    /* color: #FFF; */
+/* } */
+
+
+/* #network { */
+    /* color: #000000; */
+/* } */
+
+/* #network.disconnected, #bluetooth.disabled { */
+    /* color: gray; */
+/* } */
 
 #pulseaudio {
     background-color: #f1c40f;
@@ -181,8 +187,10 @@ label:focus {
     background-color: #f53c3c;
 }
 
-#custom-openvpn { 
-   color: red;
+#custom-media {
+    background-color: #66cc99;
+    color: #2a5c45;
+    min-width: 100px;
 }
 
 #custom-media.custom-spotify {
@@ -218,8 +226,8 @@ label:focus {
     /* background-color: #2d3436; */
 /* } */
 
- #idle_inhibitor.activated, #bluetooth.disabled, #bluetooth.off { 
-    color: grey;
+ #idle_inhibitor.activated { 
+    color: #999;
  } 
 
 
@@ -253,16 +261,4 @@ label:focus {
 
 #scratchpad.empty {
 	background-color: transparent;
-}
-
-tooltip {
-    background-color: #281733;
-	border: 1px solid black;
-	border-radius: 0;
-	padding: 0;
-}
-
-tooltip label{
-	color: white;
-	padding: 0 5px;
 }

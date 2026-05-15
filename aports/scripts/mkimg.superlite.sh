@@ -16,14 +16,22 @@ profile_superlite() {
         linux-firmware-i915 linux-firmware-amdgpu linux-firmware-amd-ucode
         linux-firmware-ath10k linux-firmware-rtlwifi linux-firmware-rtw89
         linux-firmware-rtl_bt linux-firmware-brcm linux-firmware-cirrus linux-firmware-other
-        labwc foot mesa-dri-gallium mesa-egl mesa-gl mesa-gbm seatd dbus
+        labwc labwc-doc foot mesa-dri-gallium mesa-egl mesa-gl mesa-gbm
+        mesa-va-gallium seatd dbus dbus-x11
         waybar swaybg swayidle mako tofi gammastep brightnessctl
         gsettings-desktop-schemas
-        font-awesome font-terminus simp1e-cursors
-        networkmanager
+        font-awesome font-terminus font-dejavu font-jetbrains-mono font-tamzen simp1e-cursors
+        networkmanager networkmanager-cli networkmanager-tui networkmanager-wifi
+        pcmanfm imv mpv firefox
+        grim slurp wtype wf-recorder
+        pipewire pipewire-alsa pipewire-pulse wireplumber
+        libnotify lxappearance qt5ct
+        micro helix lazygit
+        bluez
+        tlp
+        shadow
         grub-efi grub-bios syslinux squashfs-tools xorriso mkinitfs mtools dosfstools lua5.4
-        dbus-x11
-        sudo
+        sudo polkit
     "
 
     apkovl="genapkovl-superlite.sh"
