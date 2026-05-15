@@ -33,12 +33,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     superlite-themes \
 "
 
-# ── Extra packages not in packagegroups ─────────────────────────────────────
-CORE_IMAGE_EXTRA_INSTALL += " \
-    alpine-base-busybox \
-    openrc \
-"
-
 # ── Root password (live user) ──────────────────────────────────────────────
 EXTRA_USERS_PARAMS = " \
     useradd -d /home/live -s /bin/bash -G wheel live; \
@@ -93,12 +87,11 @@ managed=false
 wifi.backend=wpa_supplicant
 NM
 
-    # Auto-login on tty1
-    install -d ${IMAGE_ROOTFS}/etc/systemd/system/getty@tty1.service.d
-    cat > ${IMAGE_ROOTFS}/etc/systemd/system/getty@tty1.service.d/autologin.conf << 'AUTOLOGIN'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I 115200 linux
+    # Auto-login on tty1 (OpenRC/agetty style)
+    install -d ${IMAGE_ROOTFS}/etc/conf.d
+    cat > ${IMAGE_ROOTFS}/etc/conf.d/agetty-autologin << 'AUTOLOGIN'
+# SuperLite OS — auto-login on tty1
+GETTY_ARGS="--autologin root --noclear"
 AUTOLOGIN
 
     # XDG / Wayland environment
@@ -120,8 +113,8 @@ XDG
     chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/live
 
     # Strip binaries and remove docs to minimize image size
-    find ${IMAGE_ROOTFS}/usr/lib -name "*.so*" -type f -exec ${HOST_PREFIX}strip --strip-unneeded {} \; 2>/dev/null || true
-    find ${IMAGE_ROOTFS}/usr/bin ${IMAGE_ROOTFS}/usr/sbin -type f -exec ${HOST_PREFIX}strip --strip-unneeded {} \; 2>/dev/null || true
+    find ${IMAGE_ROOTFS}/usr/lib -name "*.so*" -type f -exec strip --strip-unneeded {} \; 2>/dev/null || true
+    find ${IMAGE_ROOTFS}/usr/bin ${IMAGE_ROOTFS}/usr/sbin -type f -exec strip --strip-unneeded {} \; 2>/dev/null || true
     rm -rf ${IMAGE_ROOTFS}/usr/share/man ${IMAGE_ROOTFS}/usr/share/doc
     rm -rf ${IMAGE_ROOTFS}/usr/share/help ${IMAGE_ROOTFS}/usr/share/gtk-doc
     rm -rf ${IMAGE_ROOTFS}/usr/share/i18n ${IMAGE_ROOTFS}/usr/share/locale/*

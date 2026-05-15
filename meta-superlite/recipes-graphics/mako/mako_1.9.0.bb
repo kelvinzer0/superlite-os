@@ -1,16 +1,16 @@
 # ============================================================================
-# SuperLite OS — Tofi Recipe
-# Rofi-style application launcher for Wayland
+# SuperLite OS — Mako Recipe
+# Lightweight Wayland notification daemon
 # ============================================================================
 
-SUMMARY = "Tofi — Wayland application launcher (rofi-style)"
-HOMEPAGE = "https://github.com/philj56/tofi"
+SUMMARY = "Mako — Lightweight Wayland notification daemon"
+HOMEPAGE = "https://github.com/emersion/mako"
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=aeaa99dbb0c0f13ab0a1e5e0b5a7f5e7"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=396832e4425ab1d690ee6be3f9fd9628"
 
-SRC_URI = "git://github.com/philj56/tofi.git;protocol=https;branch=master"
+SRC_URI = "git://github.com/emersion/mako.git;protocol=https;branch=master"
 SRCREV = "${AUTOREV}"
-PV = "0.9.1"
+PV = "1.9.0"
 
 S = "${WORKDIR}/git"
 
@@ -19,11 +19,9 @@ inherit meson pkgconfig features_check
 DEPENDS = " \
     wayland \
     wayland-protocols \
-    freetype \
-    fontconfig \
-    cairo \
     pango \
-    harfbuzz \
+    cairo \
+    glib-2.0 \
     libxkbcommon \
     wayland-native \
 "

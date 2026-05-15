@@ -31,12 +31,14 @@ die()       { log_error "$@"; exit 1; }
 # ── Args ────────────────────────────────────────────────────────────────────
 SETUP_ONLY=false
 CLEAN=false
+VERBOSE=false
 BITBAKE_ARGS=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --setup-only)   SETUP_ONLY=true; shift ;;
         --clean)        CLEAN=true; shift ;;
+        --verbose)      VERBOSE=true; shift ;;
         --bitbake-args) BITBAKE_ARGS="$2"; shift 2 ;;
         --help)
             head -15 "$0" | grep '^#' | sed 's/^# \?//'
@@ -86,6 +88,16 @@ setup_poky() {
         log_info "Cloning meta-openembedded..."
         git clone --depth 1 --branch scarthgap \
             https://git.openembedded.org/meta-openembedded "${layers_dir}/meta-openembedded"
+    fi
+
+    # meta-wayland (for wlroots, wayland-protocols, etc.)
+    if [[ ! -d "${layers_dir}/meta-wayland" ]]; then
+        log_info "Cloning meta-wayland..."
+        git clone --depth 1 --branch scarthgap \
+            https://github.com/nicira/meta-wayland.git "${layers_dir}/meta-wayland" 2>/dev/null || \
+        git clone --depth 1 --branch master \
+            https://github.com/nicira/meta-wayland.git "${layers_dir}/meta-wayland" 2>/dev/null || \
+            log_warn "meta-wayland clone failed — wlroots recipes may be missing"
     fi
 
     # meta-alpine doesn't exist — musl support is native in OE-Core via TCLIBC = "musl"

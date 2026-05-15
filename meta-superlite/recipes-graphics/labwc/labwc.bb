@@ -11,7 +11,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=751419260aa954499f7abaabaa882bbe"
 
 SRC_URI = "git://github.com/labwc/labwc.git;protocol=https;branch=master"
 SRCREV = "${AUTOREV}"
-PV = "0.8.3+git"
+PV = "0.8.3"
 
 S = "${WORKDIR}/git"
 
@@ -32,7 +32,6 @@ DEPENDS = " \
 "
 
 RDEPENDS:${PN} = " \
-    xwayland \
     swaybg \
 "
 

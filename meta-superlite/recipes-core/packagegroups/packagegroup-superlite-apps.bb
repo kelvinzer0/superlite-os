@@ -1,21 +1,16 @@
 # ============================================================================
 # SuperLite OS — Applications Package Group
-# File manager, editor, browser, screenshot tools
+# System utilities and tools
 # ============================================================================
 
 SUMMARY = "SuperLite OS desktop applications"
-DESCRIPTION = "PCManFM, Micro, Neovim, Firefox, Grim+Slurp screenshots"
+DESCRIPTION = "System utilities and tools"
 LICENSE = "MIT"
 
 inherit packagegroup
 
 RDEPENDS:${PN} = " \
-    pcmanfm \
-    micro \
-    neovim \
-    firefox \
-    grim \
-    slurp \
+    vim \
     jq \
     htop \
     tree \

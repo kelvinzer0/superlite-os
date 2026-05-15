@@ -17,11 +17,12 @@ LINUX_VERSION_EXTENSION = "-superlite"
 SRC_URI = "git://git.yoctoproject.org/linux-yocto.git;protocol=https;branch=v6.12/standard/base;name=machine \
            git://git.yoctoproject.org/yocto-kernel-cache;protocol=https;type=kmeta;name=meta;branch=yocto-6.12;destsuffix=kernel-meta"
 
+# Use AUTOREV for development; pin to specific commits for release builds
 SRCREV_machine = "${AUTOREV}"
 SRCREV_meta = "${AUTOREV}"
 SRCREV_FORMAT = "machine_meta"
 
-PV = "${LINUX_VERSION}+git"
+PV = "${LINUX_VERSION}"
 
 # Kernel config fragments
 FILESEXTRAPATHS:prepend := "${THISDIR}/linux-superlite:"

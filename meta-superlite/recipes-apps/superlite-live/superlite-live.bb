@@ -1,10 +1,10 @@
 # ============================================================================
 # SuperLite OS — Live Boot Recipe
-# Installs mkinitfs hooks, Lua live init, and live-boot scripts
+# Installs live init hooks and boot scripts
 # ============================================================================
 
 SUMMARY = "SuperLite OS live-boot support"
-DESCRIPTION = "mkinitfs feature hooks, Lua-based live init, and live-boot configuration"
+DESCRIPTION = "Live init scripts and boot configuration for SuperLite OS"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 
@@ -21,7 +21,7 @@ SRC_URI = " \
 S = "${WORKDIR}"
 
 do_install() {
-    # mkinitfs configuration
+    # mkinitfs configuration (used by live-boot hooks)
     install -d ${D}${sysconfdir}/mkinitfs/features.d
     install -d ${D}${sysconfdir}/mkinitfs
 
@@ -47,7 +47,6 @@ FILES:${PN} = " \
 "
 
 RDEPENDS:${PN} = " \
-    mkinitfs \
     lua \
     squashfs-tools \
     busybox \

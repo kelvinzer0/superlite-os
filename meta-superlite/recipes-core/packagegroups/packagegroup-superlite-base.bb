@@ -11,8 +11,6 @@ inherit packagegroup
 
 RDEPENDS:${PN} = " \
     busybox \
-    busybox-suid \
-    busybox-extras \
     kmod \
     util-linux \
     util-linux-mount \
@@ -23,7 +21,6 @@ RDEPENDS:${PN} = " \
     squashfs-tools \
     mtools \
     syslinux \
-    xorriso \
     lua \
     shadow \
     shadow-base \
@@ -44,7 +41,6 @@ RDEPENDS:${PN} = " \
     curl \
     ca-certificates \
     chrony \
-    tlp \
     openssh \
     dbus \
 "

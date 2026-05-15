@@ -10,7 +10,7 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=58a3ae03e2e3f2a3a4c8e4d1b6e3e3e3"
 
 SRC_URI = "git://github.com/Alexays/Waybar.git;protocol=https;branch=master"
 SRCREV = "${AUTOREV}"
-PV = "0.11.0+git"
+PV = "0.11.0"
 
 S = "${WORKDIR}/git"
 
@@ -20,17 +20,17 @@ DEPENDS = " \
     wayland \
     wayland-protocols \
     wlroots \
-    gtkmm-3.0 \
+    gtkmm3 \
     jsoncpp \
     libinput \
-    libsigc-2.0 \
+    libsigc++-2.0 \
     fmt \
     spdlog \
-    gtk-layer-shell \
     libnl \
     upower \
-    pulseaudio \
-    wireplumber \
+    gtk+3 \
+    glib-2.0 \
+    wayland-native \
 "
 
 REQUIRED_DISTRO_FEATURES = "wayland"
