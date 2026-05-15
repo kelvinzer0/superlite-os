@@ -77,10 +77,12 @@ if [[ "$USE_DOCKER" == true ]]; then
             mkdir -p /build/output
             chown build:build /build/output
 
-            # Build ISO (must run as non-root)
-            PRIVKEY=$(ls /home/build/.abuild/build-*.rsa 2>/dev/null | head -1)
+            # Install signing key into system so mkinitfs includes it
             PUBKEY=$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
+            PRIVKEY=$(ls /home/build/.abuild/build-*.rsa 2>/dev/null | head -1)
             echo "Signing with: $PRIVKEY"
+            cp "$PUBKEY" /etc/apk/keys/
+            echo "Key installed to /etc/apk/keys/"
             su build -c "
                 PACKAGER_PRIVKEY=$PRIVKEY \
                 PACKAGER_PUBKEY=$PUBKEY \
@@ -95,21 +97,6 @@ if [[ "$USE_DOCKER" == true ]]; then
                     --tag '"${TAG}"'
             "
 
-            # Inject signing key into apkovl overlay for CDROM trust
-            PUBKEY=$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
-            OVERLAY=$(find /build/output -name "*.apkovl.tar.gz" 2>/dev/null | head -1)
-            if [ -n "$PUBKEY" ] && [ -n "$OVERLAY" ]; then
-                echo "Injecting signing key into overlay..."
-                TMPD=$(mktemp -d)
-                cd "$TMPD"
-                tar xzf "$OVERLAY"
-                mkdir -p etc/apk/keys
-                cp "$PUBKEY" etc/apk/keys/
-                tar czf "$OVERLAY" etc/
-                cd /
-                rm -rf "$TMPD"
-                echo "Key injected into $OVERLAY"
-            fi
         '
     log "ISO built at: ${SCRIPT_DIR}/output/"
     exit 0
@@ -163,8 +150,11 @@ ISO_OUT="${OUTPUT:-${SCRIPT_DIR}/output}"
 mkdir -p "$ISO_OUT"
 
 cd /root/aports/scripts
-PACKAGER_PRIVKEY=$(ls ~/.abuild/build-*.rsa | head -1) \
-PACKAGER_PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1) \
+PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1)
+PRIVKEY=$(ls ~/.abuild/build-*.rsa | head -1)
+cp "$PUBKEY" /etc/apk/keys/
+PACKAGER_PRIVKEY="$PRIVKEY" \
+PACKAGER_PUBKEY="$PUBKEY" \
 ./mkimage.sh \
     --profile superlite \
     --arch x86_64 \
@@ -174,21 +164,6 @@ PACKAGER_PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1) \
     --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
     --outdir "$ISO_OUT" \
     --tag "$TAG"
-
-# Inject key into overlay
-PUBKEY=$(ls ~/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
-OVERLAY=$(find "$ISO_OUT" -name "*.apkovl.tar.gz" 2>/dev/null | head -1)
-if [ -n "$PUBKEY" ] && [ -n "$OVERLAY" ]; then
-    log "Injecting signing key into overlay..."
-    TMPD=$(mktemp -d)
-    cd "$TMPD"
-    tar xzf "$OVERLAY"
-    mkdir -p etc/apk/keys
-    cp "$PUBKEY" etc/apk/keys/
-    tar czf "$OVERLAY" etc/
-    cd /
-    rm -rf "$TMPD"
-fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 ISO_FILE=$(find "$ISO_OUT" -name "*.iso" -type f | head -1)
