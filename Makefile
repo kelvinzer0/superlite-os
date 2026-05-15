@@ -1,4 +1,4 @@
-.PHONY: build clean push upload help
+.PHONY: build clean validate push upload help
 
 ISO_NAME := $(shell date +%Y%m%d)
 BUILD_DIR := build
@@ -15,6 +15,9 @@ build-noefi: ## Build Legacy BIOS only
 
 clean: ## Remove build artifacts
 	sudo rm -rf $(BUILD_DIR) *.iso
+
+validate: ## Validate build output (no QEMU needed)
+	@bash tests/validate-build.sh
 
 push: ## Push to GitHub
 	git add -A && git commit -m "build: $(ISO_NAME)" && git push
