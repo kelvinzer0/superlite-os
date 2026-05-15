@@ -11,6 +11,15 @@ profile_superlite() {
     syslinux_serial="0 115200"
     modloop_sign=no
 
+    # Add testing repo for font-tamzen, gammastep, simp1e-cursors, qt5ct, lxappearance
+    repos="$repos
+        http://dl-cdn.alpinelinux.org/alpine/edge/testing
+    "
+
+    # Exclude conflicting vlan package (breaks ifupdown-ng in edge)
+    apks="$apks !vlan
+    "
+
     apks="$apks
         alpine-base openrc busybox busybox-suid busybox-static busybox-extras kmod
         linux-lts linux-virt

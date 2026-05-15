@@ -66,6 +66,7 @@ if [[ "$USE_DOCKER" == true ]]; then
                 --arch x86_64 \
                 --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
                 --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+                --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
                 --outdir /build/output/ \
                 --tag ${TAG}'
         "
