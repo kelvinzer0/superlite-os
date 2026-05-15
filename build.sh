@@ -54,6 +54,7 @@ if [[ "$USE_DOCKER" == true ]]; then
             addgroup build abuild 2>/dev/null || true &&
             echo 'build:build' | chpasswd &&
             echo 'build ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers &&
+            su build -c 'abuild-keygen -a -n' &&
             git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports &&
             chown -R build:build /home/build/aports &&
             cp /build/aports/scripts/mkimg.superlite.sh /home/build/aports/scripts/ &&
