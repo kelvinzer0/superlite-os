@@ -51,6 +51,14 @@ https://dl-cdn.alpinelinux.org/alpine/edge/community
 https://dl-cdn.alpinelinux.org/alpine/edge/testing
 EOF
 
+# ── Trust CDROM repo (no signature check for local media) ─────────────────────
+mkdir -p "$tmp"/etc/apk/keys
+# Copy build key into overlay so CDROM packages are trusted
+# This file will be overwritten by the actual key during build
+makefile root:root 0644 "$tmp"/etc/apk/keys/cdrom.trusted <<EOF
+# Placeholder: actual key injected by build.sh
+EOF
+
 # ── Package world (for post-boot apk add) ─────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/apk/world <<EOF
 alpine-base
@@ -173,6 +181,31 @@ devtmpfs        /dev     devtmpfs defaults              0 0
 tmpfs           /tmp     tmpfs    defaults,noatime      0 0
 tmpfs           /run     tmpfs    defaults,noatime      0 0
 EOF
+
+# ── Ensure /sbin/init exists ──────────────────────────────────────────────────
+# Alpine's live boot with profile_virt may not have /sbin/init in the tmpfs rootfs.
+# The apkovl overlay sets it up so the system can boot properly.
+mkdir -p "$tmp"/sbin
+
+# Create a proper init script that chains to OpenRC
+makefile root:root 0755 "$tmp"/sbin/init <<'INITEOF'
+#!/bin/sh
+# SuperLite OS — Init wrapper
+# Ensures /sbin/init exists for Alpine live boot
+
+# Mount virtual filesystems if not already mounted
+mountpoint -q /proc || mount -t proc proc /proc
+mountpoint -q /sys  || mount -t sysfs sysfs /sys
+mountpoint -q /dev  || mount -t devtmpfs devtmpfs /dev
+
+# Load modules
+for mod in loop squashfs overlay; do
+    modprobe $mod 2>/dev/null
+done
+
+# Switch to OpenRC init
+exec /sbin/openrc sysinit
+INITEOF
 
 # ── MOTD ──────────────────────────────────────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/motd <<'EOF'

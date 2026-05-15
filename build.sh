@@ -46,31 +46,68 @@ if [[ "$USE_DOCKER" == true ]]; then
         -v "${SCRIPT_DIR}:/build" \
         -w /build \
         alpine:edge \
-        sh -c "
+        sh -c '
+            set -e
+
+            # Install dependencies
             apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
                 busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
-                grub-efi grub-bios lua5.4 git &&
-            adduser -D build &&
-            addgroup build abuild 2>/dev/null || true &&
-            echo 'build:build' | chpasswd &&
-            echo 'build ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers &&
-            su build -c 'abuild-keygen -a -n' &&
-            git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports &&
-            chown -R build:build /home/build/aports &&
-            cp /build/aports/scripts/mkimg.superlite.sh /home/build/aports/scripts/ &&
-            cp /build/aports/scripts/genapkovl-superlite.sh /home/build/aports/scripts/ &&
-            ln -sf /build/dotfiles /home/build/aports/scripts/dotfiles &&
-            chown -R build:build /home/build/aports/scripts/ &&
-            mkdir -p /build/output && chown build:build /build/output &&
-            su build -c 'cd /home/build/aports/scripts && ./mkimage.sh \
-                --profile superlite \
-                --arch x86_64 \
-                --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
-                --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
-                --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
-                --outdir /build/output/ \
-                --tag ${TAG}'
-        "
+                grub-efi grub-bios lua5.4 git
+
+            # Create build user
+            adduser -D build
+            addgroup build abuild 2>/dev/null || true
+            echo "build:build" | chpasswd
+            echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+            # Generate signing key
+            su build -c "abuild-keygen -a -n"
+
+            # Clone aports
+            git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports
+
+            # Copy SuperLite profile + overlay
+            cp /build/aports/scripts/mkimg.superlite.sh /home/build/aports/scripts/
+            cp /build/aports/scripts/genapkovl-superlite.sh /home/build/aports/scripts/
+            chmod +x /home/build/aports/scripts/genapkovl-superlite.sh
+            ln -sf /build/dotfiles /home/build/aports/scripts/dotfiles
+            chown -R build:build /home/build/aports
+
+            # Prepare output dir
+            mkdir -p /build/output
+            chown build:build /build/output
+
+            # Build ISO (must run as non-root)
+            su build -c "
+                PACKAGER_PRIVKEY=\$(ls /home/build/.abuild/build-*.rsa | head -1) \
+                PACKAGER_PUBKEY=\$(ls /home/build/.abuild/build-*.rsa.pub | head -1) \
+                cd /home/build/aports/scripts && ./mkimage.sh \
+                    --profile superlite \
+                    --arch x86_64 \
+                    --hostkeys \
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
+                    --outdir /build/output/ \
+                    --tag '"${TAG}"'
+            "
+
+            # Inject signing key into apkovl overlay for CDROM trust
+            PUBKEY=$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
+            OVERLAY=$(find /build/output -name "*.apkovl.tar.gz" 2>/dev/null | head -1)
+            if [ -n "$PUBKEY" ] && [ -n "$OVERLAY" ]; then
+                echo "Injecting signing key into overlay..."
+                TMPD=$(mktemp -d)
+                cd "$TMPD"
+                tar xzf "$OVERLAY"
+                mkdir -p etc/apk/keys
+                cp "$PUBKEY" etc/apk/keys/
+                tar czf "$OVERLAY" etc/
+                cd /
+                rm -rf "$TMPD"
+                echo "Key injected into $OVERLAY"
+            fi
+        '
     log "ISO built at: ${SCRIPT_DIR}/output/"
     exit 0
 fi
@@ -88,6 +125,12 @@ apk add --no-cache \
     busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
     grub-efi grub-bios lua5.4 git 2>/dev/null || true
 
+# ── Generate signing key if needed ────────────────────────────────────────────
+if ! ls ~/.abuild/build-*.rsa >/dev/null 2>&1; then
+    log "Generating signing key..."
+    abuild-keygen -a -n
+fi
+
 # ── Clone aports if needed ────────────────────────────────────────────────────
 if [[ ! -d /root/aports ]]; then
     log "Cloning aports..."
@@ -100,18 +143,14 @@ cp "${APORTS_DIR}/scripts/mkimg.superlite.sh"   /root/aports/scripts/
 cp "${APORTS_DIR}/scripts/genapkovl-superlite.sh" /root/aports/scripts/
 chmod +x /root/aports/scripts/genapkovl-superlite.sh
 
-# ── Copy assets that genapkovl needs ──────────────────────────────────────────
-# genapkovl-superlite.sh references $SCRIPT_DIR/../../dotfiles
-# We need them accessible relative to the script in aports/scripts
 if [[ -d "${SCRIPT_DIR}/dotfiles" ]]; then
-    # Create a symlink so the script can find dotfiles
     ln -sf "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles 2>/dev/null || \
         cp -r "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles
 fi
 
 if [[ "$SETUP_ONLY" == true ]]; then
     log "Setup complete. Build manually with:"
-    log "  cd /root/aports/scripts && ./mkimage.sh --profile superlite --arch x86_64 --outdir /root/iso/ --tag ${TAG}"
+    log "  cd /root/aports/scripts && PACKAGER_PRIVKEY=~/.abuild/build-*.rsa ./mkimage.sh --profile superlite --arch x86_64 --hostkeys --outdir ~/iso/ --tag ${TAG}"
     exit 0
 fi
 
@@ -121,13 +160,32 @@ ISO_OUT="${OUTPUT:-${SCRIPT_DIR}/output}"
 mkdir -p "$ISO_OUT"
 
 cd /root/aports/scripts
+PACKAGER_PRIVKEY=$(ls ~/.abuild/build-*.rsa | head -1) \
+PACKAGER_PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1) \
 ./mkimage.sh \
     --profile superlite \
     --arch x86_64 \
+    --hostkeys \
     --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
     --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+    --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
     --outdir "$ISO_OUT" \
     --tag "$TAG"
+
+# Inject key into overlay
+PUBKEY=$(ls ~/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
+OVERLAY=$(find "$ISO_OUT" -name "*.apkovl.tar.gz" 2>/dev/null | head -1)
+if [ -n "$PUBKEY" ] && [ -n "$OVERLAY" ]; then
+    log "Injecting signing key into overlay..."
+    TMPD=$(mktemp -d)
+    cd "$TMPD"
+    tar xzf "$OVERLAY"
+    mkdir -p etc/apk/keys
+    cp "$PUBKEY" etc/apk/keys/
+    tar czf "$OVERLAY" etc/
+    cd /
+    rm -rf "$TMPD"
+fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 ISO_FILE=$(find "$ISO_OUT" -name "*.iso" -type f | head -1)
