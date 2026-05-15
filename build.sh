@@ -134,8 +134,8 @@ DISTRO = "${DISTRO}"
 PACKAGE_CLASSES = "package_ipk"
 
 # Parallel build
-BB_NUMBER_THREADS = "\$(nproc)"
-PARALLEL_MAKE = "-j \$(nproc)"
+BB_NUMBER_THREADS = "${@os.cpu_count()}"
+PARALLEL_MAKE = "-j ${@os.cpu_count()}"
 
 # Disk monitoring
 BB_DISKMON_DIRS = "\\
