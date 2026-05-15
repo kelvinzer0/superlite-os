@@ -9,7 +9,7 @@ HOMEPAGE = "https://github.com/labwc/labwc"
 LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=751419260aa954499f7abaabaa882bbe"
 
-SRC_URI = "git://github.com/labwc/labwc.git;protocol=https;branch=main"
+SRC_URI = "git://github.com/labwc/labwc.git;protocol=https;branch=master"
 SRCREV = "${AUTOREV}"
 PV = "0.8.3+git"
 
