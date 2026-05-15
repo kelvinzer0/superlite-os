@@ -51,15 +51,6 @@ https://dl-cdn.alpinelinux.org/alpine/edge/community
 https://dl-cdn.alpinelinux.org/alpine/edge/testing
 EOF
 
-# ── Repositories ──────────────────────────────────────────────────────────────
-mkdir -p "$tmp"/etc/apk
-makefile root:root 0644 "$tmp"/etc/apk/repositories <<EOF
-/media/cdrom/apks
-https://dl-cdn.alpinelinux.org/alpine/edge/main
-https://dl-cdn.alpinelinux.org/alpine/edge/community
-https://dl-cdn.alpinelinux.org/alpine/edge/testing
-EOF
-
 # ── Package world (for post-boot apk add) ─────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/apk/world <<EOF
 alpine-base
@@ -69,7 +60,6 @@ busybox-suid
 busybox-static
 kmod
 linux-lts
-linux-virt
 labwc
 foot
 mesa-dri-gallium

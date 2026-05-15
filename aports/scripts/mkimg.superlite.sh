@@ -4,7 +4,7 @@
 # ============================================================================
 
 profile_superlite() {
-    profile_base
+    profile_virt
 
     kernel_cmdline="unionfs_size=2G console=tty0 console=ttyS0,115200"
     initfs_cmdline="modules=loop,squashfs,sd-mod,usb-storage,iso9660,vfat,nls_cp437,nls_iso8859_1 quiet"
