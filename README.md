@@ -1,5 +1,7 @@
 # SuperLite OS
 
+[![Build SuperLite OS ISO](https://github.com/kelvinzer0/superlite-os/actions/workflows/build.yml/badge.svg)](https://github.com/kelvinzer0/superlite-os/actions/workflows/build.yml)
+
 **Alpine Linux + LabWC Wayland** — Minimal, fast, beautiful.
 
 > Uses Alpine's native `mkimage.sh` for building. No Yocto. No bitbake. No initramfs hacking. Just works.
