@@ -12,7 +12,11 @@ if [ -z "$HOSTNAME" ]; then
     exit 1
 fi
 
-cleanup() { rm -rf "$tmp"; }
+cleanup() { 
+    rm -rf "$tmp"; 
+    rm -rf "$tmp"/usr/share/doc;
+    rm -rf "$tmp"/usr/share/man;
+}
 
 makefile() {
     OWNER="$1"; PERMS="$2"; FILENAME="$3"
