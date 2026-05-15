@@ -50,18 +50,23 @@ if [[ "$USE_DOCKER" == true ]]; then
             apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
                 busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
                 grub-efi grub-bios lua5.4 git &&
-            adduser build -G abuild 2>/dev/null || true &&
-            git clone --depth=1 git://git.alpinelinux.org/aports /root/aports 2>/dev/null || true &&
-            cp /build/aports/scripts/mkimg.superlite.sh /root/aports/scripts/ &&
-            cp /build/aports/scripts/genapkovl-superlite.sh /root/aports/scripts/ &&
-            cd /root/aports/scripts &&
-            ./mkimage.sh \
+            adduser -D build -G abuild &&
+            echo 'build:build' | chpasswd &&
+            echo 'build ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers &&
+            git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports &&
+            chown -R build:build /home/build/aports &&
+            cp /build/aports/scripts/mkimg.superlite.sh /home/build/aports/scripts/ &&
+            cp /build/aports/scripts/genapkovl-superlite.sh /home/build/aports/scripts/ &&
+            ln -sf /build/dotfiles /home/build/aports/scripts/dotfiles &&
+            chown -R build:build /home/build/aports/scripts/ &&
+            mkdir -p /build/output && chown build:build /build/output &&
+            su build -c 'cd /home/build/aports/scripts && ./mkimage.sh \
                 --profile superlite \
                 --arch x86_64 \
                 --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
                 --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
                 --outdir /build/output/ \
-                --tag ${TAG}
+                --tag ${TAG}'
         "
     log "ISO built at: ${SCRIPT_DIR}/output/"
     exit 0
