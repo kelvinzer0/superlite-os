@@ -1,0 +1,15 @@
+# ============================================================================
+# SuperLite OS — WIC Kickstart File
+# Defines the partition layout for the bootable ISO/USB image
+#
+# Layout:
+#   - BIOS boot via syslinux/isolinux (MBR)
+#   - UEFI boot via GRUB (EFI System Partition)
+#   - Live rootfs as squashfs on ISO9660
+# ============================================================================
+
+# ISO9660 partition with live squashfs
+part /boot --source isoimage-isorescue --sourceparams="loader=grub-efi" --ondisk sda --fstype=iso9660 --label SUPERLITE --align 1024 --use-uuid
+
+# Include both UEFI and Legacy BIOS boot
+bootloader  --ptable gpt --timeout=5 --append="boot=live console=ttyS0,115200 loglevel=7"

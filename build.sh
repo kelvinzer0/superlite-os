@@ -1,277 +1,241 @@
 #!/usr/bin/env bash
 # ============================================================================
-# SuperLite OS — Build Script
-# Builds a bootable hybrid ISO (UEFI + Legacy BIOS) from Alpine Linux edge
-# with a LabWC Wayland desktop environment.
+# SuperLite OS — Yocto Build Script
+# Initializes Poky/OE-Core and builds the SuperLite OS image
 #
 # Usage: ./build.sh [OPTIONS]
-#   --clean      Remove build artifacts before building
-#   --no-efi     Skip EFI boot support (Legacy BIOS only)
-#   --verbose    Show detailed build output
-#   --help       Show this help message
-#
-# Requirements (Debian/Ubuntu host):
-#   sudo apt install squashfs-tools xorriso mtools dosfstools \
-#     wget ca-certificates
+#   --setup-only    Only set up the Yocto environment, don't build
+#   --clean         Clean build artifacts before building
+#   --bitbake-args  Extra args passed to bitbake
+#   --help          Show help
 # ============================================================================
 
 set -euo pipefail
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/build"
-ROOTFS_DIR="${BUILD_DIR}/rootfs"
-ISO_DIR="${SCRIPT_DIR}/iso"
-OUTPUT_DIR="${SCRIPT_DIR}"
+POKY_DIR="${BUILD_DIR}/poky"
+META_SUPERLITE="${SCRIPT_DIR}/meta-superlite"
+MACHINE="superlite-x86_64"
+DISTRO="superlite"
+IMAGE="superlite-os-image"
 
-ALPINE_VERSION="3.21"
-ALPINE_MIRROR="https://dl-cdn.alpinelinux.org/alpine"
-MINIROOTFS_URL="${ALPINE_MIRROR}/v${ALPINE_VERSION}/releases/x86_64/alpine-minirootfs-${ALPINE_VERSION}.3-x86_64.tar.gz"
-MINIROOTFS_CACHE="${BUILD_DIR}/alpine-minirootfs.tar.gz"
-
-PACKAGES_LIST="${SCRIPT_DIR}/alpine/configs/packages.list"
-REPOS_FILE="${SCRIPT_DIR}/alpine/configs/repositories"
-SETUP_SCRIPT="${SCRIPT_DIR}/alpine/scripts/setup-rootfs.sh"
-DOTFILES_DIR="${SCRIPT_DIR}/dotfiles"
-
-VERSION="$(date +%Y%m%d)"
-ISO_NAME="superlite-os-${VERSION}.iso"
-
-# Flags
-CLEAN=false
-NO_EFI=false
-VERBOSE=false
-
-# ---------------------------------------------------------------------------
-# Colors & logging
-# ---------------------------------------------------------------------------
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
+# ── Colors ──────────────────────────────────────────────────────────────────
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log_info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 log_step()  { echo -e "${BLUE}[STEP]${NC} $*"; }
-log_debug() { [[ "$VERBOSE" == true ]] && echo -e "[DEBUG] $*" || true; }
+die()       { log_error "$@"; exit 1; }
 
-die() { log_error "$@"; exit 1; }
+# ── Args ────────────────────────────────────────────────────────────────────
+SETUP_ONLY=false
+CLEAN=false
+BITBAKE_ARGS=""
 
-# ---------------------------------------------------------------------------
-# Parse arguments
-# ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --clean)   CLEAN=true; shift ;;
-        --no-efi)  NO_EFI=true; shift ;;
-        --verbose) VERBOSE=true; shift ;;
+        --setup-only)   SETUP_ONLY=true; shift ;;
+        --clean)        CLEAN=true; shift ;;
+        --bitbake-args) BITBAKE_ARGS="$2"; shift 2 ;;
         --help)
-            head -20 "$0" | grep '^#' | sed 's/^# \?//'
+            head -15 "$0" | grep '^#' | sed 's/^# \?//'
             exit 0
             ;;
         *) die "Unknown option: $1" ;;
     esac
 done
 
-# ---------------------------------------------------------------------------
-# Pre-flight checks
-# ---------------------------------------------------------------------------
+# ── Preflight ──────────────────────────────────────────────────────────────
 check_deps() {
     local missing=()
-    for cmd in mksquashfs wget tar; do
-        if ! command -v "$cmd" &>/dev/null; then
-            missing+=("$cmd")
-        fi
+    for cmd in git python3 tar gzip diffstat chrpath cpio wget; do
+        command -v "$cmd" &>/dev/null || missing+=("$cmd")
     done
+    [[ ${#missing[@]} -gt 0 ]] && die "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio python3 python3-pip python3-pexpect python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales libacl1"
 
-    # Check for xorriso or mkisofs
-    if ! command -v xorriso &>/dev/null && ! command -v mkisofs &>/dev/null; then
-        missing+=("xorriso")
+    # Check for xorriso (ISO generation)
+    command -v xorriso &>/dev/null || log_warn "xorriso not found — ISO generation will fail. Install: sudo apt install xorriso"
+
+    # Check for squashfs-tools
+    command -v mksquashfs &>/dev/null || log_warn "squashfs-tools not found. Install: sudo apt install squashfs-tools"
+
+    # Check locale
+    locale -a 2>/dev/null | grep -qi "en_us.utf" || log_warn "en_US.UTF-8 locale not found — Yocto may fail. Run: sudo locale-gen en_US.UTF-8"
+}
+
+# ── Setup Poky ─────────────────────────────────────────────────────────────
+setup_poky() {
+    log_step "Setting up Poky (Yocto reference build system)..."
+
+    mkdir -p "$BUILD_DIR"
+
+    if [[ ! -d "$POKY_DIR" ]]; then
+        log_info "Cloning Poky (scarthgap branch)..."
+        git clone --depth 1 --branch scarthgap \
+            https://git.yoctoproject.org/poky "$POKY_DIR"
+    else
+        log_info "Poky already present at ${POKY_DIR}"
     fi
 
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        die "Missing dependencies: ${missing[*]}\nInstall with: sudo apt install squashfs-tools xorriso mtools dosfstools wget"
+    # Clone required layers
+    local layers_dir="${POKY_DIR}/.."
+
+    # meta-openembedded (for additional packages)
+    if [[ ! -d "${layers_dir}/meta-openembedded" ]]; then
+        log_info "Cloning meta-openembedded..."
+        git clone --depth 1 --branch scarthgap \
+            https://git.openembedded.org/meta-openembedded "${layers_dir}/meta-openembedded"
     fi
 
-    # Check root for chroot operations
-    if [[ $EUID -ne 0 ]]; then
-        log_warn "Not running as root. Will use sudo for chroot operations."
+    # meta-alpine (for musl/Alpine packages — optional)
+    if [[ ! -d "${layers_dir}/meta-alpine" ]]; then
+        log_info "Cloning meta-alpine (optional, for musl support)..."
+        git clone --depth 1 \
+            https://github.com/agherzan/meta-alpine.git "${layers_dir}/meta-alpine" 2>/dev/null || \
+            log_warn "meta-alpine not available — using glibc fallback"
     fi
 }
 
-# ---------------------------------------------------------------------------
-# Step 1: Download Alpine minirootfs
-# ---------------------------------------------------------------------------
-download_rootfs() {
-    log_step "Downloading Alpine Linux minirootfs..."
+# ── Configure build ────────────────────────────────────────────────────────
+configure_build() {
+    log_step "Configuring Yocto build..."
 
-    if [[ -f "$MINIROOTFS_CACHE" ]]; then
-        log_info "Using cached minirootfs: ${MINIROOTFS_CACHE}"
+    local conf_dir="${BUILD_DIR}/conf"
+    mkdir -p "$conf_dir"
+
+    # bblayers.conf
+    cat > "${conf_dir}/bblayers.conf" << EOF
+# POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+# changes incompatibly
+POKY_BBLAYERS_CONF_VERSION = "2"
+
+BBPATH = "\${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS = " \\
+  ${POKY_DIR}/meta \\
+  ${POKY_DIR}/meta-poky \\
+  ${POKY_DIR}/meta-yocto-bsp \\
+  ${BUILD_DIR}/../meta-openembedded/meta-oe \\
+  ${BUILD_DIR}/../meta-openembedded/meta-python \\
+  ${BUILD_DIR}/../meta-openembedded/meta-networking \\
+  ${BUILD_DIR}/../meta-openembedded/meta-multimedia \\
+  ${META_SUPERLITE} \\
+"
+EOF
+
+    # Add meta-alpine if available
+    if [[ -d "${BUILD_DIR}/../meta-alpine" ]]; then
+        sed -i '/meta-multimedia/a\  ${TOPDIR}/../meta-alpine \\' "${conf_dir}/bblayers.conf"
+    fi
+
+    # local.conf
+    cat > "${conf_dir}/local.conf" << EOF
+# SuperLite OS — Yocto Build Configuration
+
+MACHINE = "${MACHINE}"
+DISTRO = "${DISTRO}"
+
+# Package management
+PACKAGE_CLASSES = "package_ipk"
+
+# Parallel build
+BB_NUMBER_THREADS = "\$(nproc)"
+PARALLEL_MAKE = "-j \$(nproc)"
+
+# Disk monitoring
+BB_DISKMON_DIRS = "\\
+    STOPTASKS,\${TMPDIR},1G,100K \\
+    STOPTASKS,\${DL_DIR},1G,100K \\
+    STOPTASKS,\${SSTATE_DIR},1G,100K \\
+    ABORT,\${TMPDIR},100M,1K \\
+    ABORT,\${DL_DIR},100M,1K \\
+    ABORT,\${SSTATE_DIR},100M,1K"
+
+# Download directory (shared across builds)
+DL_DIR = "\${TOPDIR}/downloads"
+SSTATE_DIR = "\${TOPDIR}/sstate-cache"
+
+# Image type
+IMAGE_FSTYPES = "squashfs-xz"
+
+# Security — accept commercial licenses for firmware
+LICENSE_FLAGS_ACCEPTED += "commercial"
+
+# Enable kernel build
+KERNEL_IMAGETYPE = "bzImage"
+
+# Extra space for live image
+IMAGE_ROOTFS_EXTRA_SPACE = "0"
+
+# Debug — keep working directory for debugging
+RM_WORK_EXCLUDE += "linux-superlite"
+
+# Preserve build history
+INHERIT += "buildhistory"
+BUILDHISTORY_COMMIT = "1"
+EOF
+
+    log_info "Build configuration written to ${conf_dir}/"
+}
+
+# ── Build ──────────────────────────────────────────────────────────────────
+build_image() {
+    log_step "Initializing BitBake environment..."
+    cd "$POKY_DIR"
+    source oe-init-build-env "$BUILD_DIR"
+
+    if [[ "$SETUP_ONLY" == true ]]; then
+        log_info "Setup complete. To build manually:"
+        log_info "  cd ${BUILD_DIR}"
+        log_info "  source ${POKY_DIR}/oe-init-build-env ${BUILD_DIR}"
+        log_info "  bitbake ${IMAGE}"
         return 0
     fi
 
-    mkdir -p "$BUILD_DIR"
-    wget -q --show-progress -O "$MINIROOTFS_CACHE" "$MINIROOTFS_URL" \
-        || die "Failed to download minirootfs from ${MINIROOTFS_URL}"
+    log_step "Building ${IMAGE} (this will take a while)..."
+    bitbake ${IMAGE} ${BITBAKE_ARGS}
 
-    log_info "Downloaded minirootfs to ${MINIROOTFS_CACHE}"
-}
-
-# ---------------------------------------------------------------------------
-# Step 2: Create chroot rootfs
-# ---------------------------------------------------------------------------
-create_rootfs() {
-    log_step "Creating Alpine rootfs..."
-
-    # Clean previous rootfs
-    [[ -d "$ROOTFS_DIR" ]] && rm -rf "$ROOTFS_DIR"
-    mkdir -p "$ROOTFS_DIR"
-
-    # Extract minirootfs
-    log_info "Extracting minirootfs..."
-    tar -xzf "$MINIROOTFS_CACHE" -C "$ROOTFS_DIR"
-
-    # Mount required filesystems for chroot
-    log_info "Mounting virtual filesystems..."
-    mount --bind /dev     "${ROOTFS_DIR}/dev"     2>/dev/null || true
-    mount --bind /dev/pts "${ROOTFS_DIR}/dev/pts" 2>/dev/null || true
-    mount --bind /proc    "${ROOTFS_DIR}/proc"    2>/dev/null || true
-    mount --bind /sys     "${ROOTFS_DIR}/sys"     2>/dev/null || true
-
-    # Copy resolv.conf for DNS
-    cp /etc/resolv.conf "${ROOTFS_DIR}/etc/resolv.conf"
-
-    log_info "Rootfs created at ${ROOTFS_DIR}"
-}
-
-# ---------------------------------------------------------------------------
-# Step 3: Configure and install packages inside chroot
-# ---------------------------------------------------------------------------
-configure_rootfs() {
-    log_step "Configuring Alpine rootfs in chroot..."
-
-    # Copy the setup script and configs into rootfs
-    cp "$SETUP_SCRIPT"   "${ROOTFS_DIR}/tmp/setup-rootfs.sh"
-    cp "$PACKAGES_LIST"  "${ROOTFS_DIR}/tmp/packages.list"
-    cp "$REPOS_FILE"     "${ROOTFS_DIR}/tmp/repositories"
-    chmod +x "${ROOTFS_DIR}/tmp/setup-rootfs.sh"
-
-    # Copy dotfiles into rootfs for installation
-    if [[ -d "$DOTFILES_DIR" ]]; then
-        cp -r "$DOTFILES_DIR" "${ROOTFS_DIR}/tmp/dotfiles"
+    # Build ISO if image succeeded
+    log_step "Building bootable ISO..."
+    if command -v superlite-boot &>/dev/null; then
+        superlite-boot --build-dir "$BUILD_DIR" --output "${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
+    elif [[ -f "${META_SUPERLITE}/recipes-apps/superlite-live/superlite-live/superlite-boot.sh" ]]; then
+        bash "${META_SUPERLITE}/recipes-apps/superlite-live/superlite-live/superlite-boot.sh" \
+            --build-dir "$BUILD_DIR" \
+            --output "${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
+    else
+        log_warn "superlite-boot not found. Run it manually to create the ISO."
     fi
-
-    # Copy hooks if they exist (includes firmware compression script)
-    if [[ -d "${SCRIPT_DIR}/alpine/hooks" ]]; then
-        cp -r "${SCRIPT_DIR}/alpine/hooks" "${ROOTFS_DIR}/tmp/hooks"
-        # Also copy the firmware compression script
-        if [[ -f "${SCRIPT_DIR}/alpine/scripts/compress-firmware.sh" ]]; then
-            cp "${SCRIPT_DIR}/alpine/scripts/compress-firmware.sh" "${ROOTFS_DIR}/tmp/hooks/"
-        fi
-    fi
-
-    # Copy theme installer script
-    if [[ -f "${SCRIPT_DIR}/alpine/scripts/install-themes.sh" ]]; then
-        mkdir -p "${ROOTFS_DIR}/tmp/hooks"
-        cp "${SCRIPT_DIR}/alpine/scripts/install-themes.sh" "${ROOTFS_DIR}/tmp/hooks/"
-    fi
-
-    # Copy pre-built themes (WhiteSur, Haiku, OhSnap)
-    if [[ -d "${SCRIPT_DIR}/alpine/packages/themes" ]]; then
-        mkdir -p "${ROOTFS_DIR}/tmp/themes"
-        cp "${SCRIPT_DIR}/alpine/packages/themes/"* "${ROOTFS_DIR}/tmp/themes/" 2>/dev/null || true
-    fi
-
-    # Copy mkinitfs config and live-boot feature hook
-    for f in mkinitfs-superlite.conf superlite-live; do
-        [[ -f "${SCRIPT_DIR}/alpine/packages/$f" ]] && \
-            cp "${SCRIPT_DIR}/alpine/packages/$f" "${ROOTFS_DIR}/tmp/hooks/"
-    done
-    # Copy Lua live init + wrapper from hooks
-    for f in superlite-live.init superlite-init-wrapper; do
-        [[ -f "${SCRIPT_DIR}/alpine/hooks/$f" ]] && \
-            cp "${SCRIPT_DIR}/alpine/hooks/$f" "${ROOTFS_DIR}/tmp/hooks/"
-    done
-
-    # Run setup inside chroot
-    log_info "Running setup-rootfs.sh inside chroot (this may take a while)..."
-    chroot "${ROOTFS_DIR}" /bin/sh /tmp/setup-rootfs.sh \
-        || die "setup-rootfs.sh failed inside chroot"
-
-    log_info "Rootfs configuration complete."
 }
 
-# ---------------------------------------------------------------------------
-# Step 4: Build ISO
-# ---------------------------------------------------------------------------
-build_iso() {
-    log_step "Building hybrid ISO..."
-
-    # Delegate to make-iso.sh
-    bash "${SCRIPT_DIR}/alpine/scripts/make-iso.sh" \
-        --rootfs "$ROOTFS_DIR" \
-        --iso-dir "$ISO_DIR" \
-        --output "${OUTPUT_DIR}/${ISO_NAME}" \
-        --version "$VERSION" \
-        $( [[ "$NO_EFI" == true ]] && echo "--no-efi" ) \
-        $( [[ "$VERBOSE" == true ]] && echo "--verbose" )
-
-    local iso_size
-    iso_size=$(du -sh "${OUTPUT_DIR}/${ISO_NAME}" | cut -f1)
-    log_info "ISO created: ${OUTPUT_DIR}/${ISO_NAME} (${iso_size})"
-}
-
-# ---------------------------------------------------------------------------
-# Step 5: Cleanup
-# ---------------------------------------------------------------------------
-cleanup() {
-    log_step "Cleaning up mount points..."
-
-    # Unmount chroot filesystems
-    umount "${ROOTFS_DIR}/sys"     2>/dev/null || true
-    umount "${ROOTFS_DIR}/proc"    2>/dev/null || true
-    umount "${ROOTFS_DIR}/dev/pts" 2>/dev/null || true
-    umount "${ROOTFS_DIR}/dev"     2>/dev/null || true
-}
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# ── Main ───────────────────────────────────────────────────────────────────
 main() {
     echo ""
     echo "╔══════════════════════════════════════════════╗"
-    echo "║         SuperLite OS Build System            ║"
-    echo "║     Alpine Linux + LabWC Wayland Desktop     ║"
+    echo "║     SuperLite OS — Yocto Build System        ║"
+    echo "║  Alpine Linux + LabWC Wayland Desktop        ║"
     echo "╚══════════════════════════════════════════════╝"
     echo ""
 
-    # Clean if requested
     if [[ "$CLEAN" == true ]]; then
         log_info "Cleaning build directory..."
-        cleanup
-        rm -rf "$BUILD_DIR"
+        rm -rf "$BUILD_DIR"/{tmp*,sstate-cache,cache}
     fi
 
-    # Trap for cleanup on exit
-    trap cleanup EXIT
-
     check_deps
-    download_rootfs
-    create_rootfs
-    configure_rootfs
-    build_iso
+    setup_poky
+    configure_build
+    build_image
 
     echo ""
     log_info "═══════════════════════════════════════════════"
     log_info "Build complete!"
-    log_info "ISO: ${OUTPUT_DIR}/${ISO_NAME}"
+    log_info "ISO: ${SCRIPT_DIR}/superlite-os-$(date +%Y%m%d).iso"
     log_info ""
     log_info "Write to USB:"
-    log_info "  sudo dd if=${ISO_NAME} of=/dev/sdX bs=4M status=progress"
+    log_info "  sudo dd if=superlite-os-*.iso of=/dev/sdX bs=4M status=progress"
     log_info "═══════════════════════════════════════════════"
 }
 
