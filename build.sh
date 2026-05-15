@@ -117,17 +117,17 @@ BBLAYERS = " \\
   ${POKY_DIR}/meta \\
   ${POKY_DIR}/meta-poky \\
   ${POKY_DIR}/meta-yocto-bsp \\
-  ${BUILD_DIR}/../meta-openembedded/meta-oe \\
-  ${BUILD_DIR}/../meta-openembedded/meta-python \\
-  ${BUILD_DIR}/../meta-openembedded/meta-networking \\
-  ${BUILD_DIR}/../meta-openembedded/meta-multimedia \\
+  ${BUILD_DIR}/meta-openembedded/meta-oe \\
+  ${BUILD_DIR}/meta-openembedded/meta-python \\
+  ${BUILD_DIR}/meta-openembedded/meta-networking \\
+  ${BUILD_DIR}/meta-openembedded/meta-multimedia \\
   ${META_SUPERLITE} \\
 "
 EOF
 
     # Add meta-alpine if available
-    if [[ -d "${BUILD_DIR}/../meta-alpine" ]]; then
-        sed -i '/meta-multimedia/a\  ${TOPDIR}/../meta-alpine \\' "${conf_dir}/bblayers.conf"
+    if [[ -d "${BUILD_DIR}/meta-alpine" ]]; then
+        sed -i '/meta-multimedia/a\  ${TOPDIR}/meta-alpine \\' "${conf_dir}/bblayers.conf"
     fi
 
     # local.conf
