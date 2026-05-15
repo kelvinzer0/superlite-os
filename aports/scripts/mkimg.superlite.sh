@@ -22,7 +22,7 @@ profile_superlite() {
 
     apks="$apks
         alpine-base openrc busybox busybox-suid busybox-static busybox-extras kmod
-        linux-lts linux-virt
+        linux-lts
         linux-firmware-i915 linux-firmware-amdgpu linux-firmware-amd-ucode
         linux-firmware-ath10k linux-firmware-rtlwifi linux-firmware-rtw89
         linux-firmware-rtl_bt linux-firmware-brcm linux-firmware-cirrus linux-firmware-other
@@ -46,5 +46,5 @@ profile_superlite() {
 
     apkovl="genapkovl-superlite.sh"
 
-    #kernel_flavors="lts"
+    kernel_flavors="lts"
 }
