@@ -123,12 +123,12 @@ EOF
     # Musl support: uncomment TCLIBC = "musl" in local.conf if needed.
     # No extra layer required — OE-Core supports musl natively.
 
-    # local.conf
-    cat > "${conf_dir}/local.conf" << EOF
+    # local.conf — use quoted heredoc to avoid bash expanding BitBake/python vars
+    cat > "${conf_dir}/local.conf" << 'EOF'
 # SuperLite OS — Yocto Build Configuration
 
-MACHINE = "${MACHINE}"
-DISTRO = "${DISTRO}"
+MACHINE = "MACHINE_PLACEHOLDER"
+DISTRO = "DISTRO_PLACEHOLDER"
 
 # Package management
 PACKAGE_CLASSES = "package_ipk"
@@ -138,17 +138,17 @@ BB_NUMBER_THREADS = "${@os.cpu_count()}"
 PARALLEL_MAKE = "-j ${@os.cpu_count()}"
 
 # Disk monitoring
-BB_DISKMON_DIRS = "\\
-    STOPTASKS,\${TMPDIR},1G,100K \\
-    STOPTASKS,\${DL_DIR},1G,100K \\
-    STOPTASKS,\${SSTATE_DIR},1G,100K \\
-    ABORT,\${TMPDIR},100M,1K \\
-    ABORT,\${DL_DIR},100M,1K \\
-    ABORT,\${SSTATE_DIR},100M,1K"
+BB_DISKMON_DIRS = "\
+    STOPTASKS,${TMPDIR},1G,100K \
+    STOPTASKS,${DL_DIR},1G,100K \
+    STOPTASKS,${SSTATE_DIR},1G,100K \
+    ABORT,${TMPDIR},100M,1K \
+    ABORT,${DL_DIR},100M,1K \
+    ABORT,${SSTATE_DIR},100M,1K"
 
 # Download directory (shared across builds)
-DL_DIR = "\${TOPDIR}/downloads"
-SSTATE_DIR = "\${TOPDIR}/sstate-cache"
+DL_DIR = "${TOPDIR}/downloads"
+SSTATE_DIR = "${TOPDIR}/sstate-cache"
 
 # Image type
 IMAGE_FSTYPES = "squashfs-xz"
@@ -169,6 +169,10 @@ RM_WORK_EXCLUDE += "linux-superlite"
 INHERIT += "buildhistory"
 BUILDHISTORY_COMMIT = "1"
 EOF
+
+    # Inject actual MACHINE and DISTRO values
+    sed -i "s|MACHINE_PLACEHOLDER|${MACHINE}|" "${conf_dir}/local.conf"
+    sed -i "s|DISTRO_PLACEHOLDER|${DISTRO}|" "${conf_dir}/local.conf"
 
     log_info "Build configuration written to ${conf_dir}/"
 }
