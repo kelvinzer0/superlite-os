@@ -41,7 +41,7 @@ log() { echo "[build] $*"; }
 # ── Docker build ──────────────────────────────────────────────────────────────
 if [[ "$USE_DOCKER" == true ]]; then
     log "Building inside Docker..."
-    docker run --rm -it \
+    docker run --rm \
         --privileged \
         -v "${SCRIPT_DIR}:/build" \
         -w /build \
