@@ -1,8 +1,4 @@
 <?xml version="1.0"?>
-<!--
-  SuperLite OS — LabWC config (LabWC-Alpine-Netbook style)
-  Based on RiccardoPP's dotfiles aesthetic
--->
 <labwc_config>
   <core>
     <decoration>server</decoration>
@@ -22,6 +18,7 @@
     <cornerRadius>0</cornerRadius>
     <keepBorder>yes</keepBorder>
     <dropShadows>no</dropShadows>
+
     <font place="ActiveWindow">
       <name>Misc OhSnap</name>
       <size>8</size>
@@ -104,74 +101,30 @@
     <layoutScope>global</layoutScope>
     <repeatRate>25</repeatRate>
     <repeatDelay>600</repeatDelay>
-
-    <!-- Window switcher -->
     <keybind key="W-Tab">
       <action name="NextWindow"/>
     </keybind>
-
-    <!-- Terminal -->
     <keybind key="W-Return">
       <action name="Execute" command="foot"/>
     </keybind>
     <keybind key="W-S-Return">
       <action name="Execute" command="foot --override=colors.background=000000 --override=colors.foreground=ffffff"/>
     </keybind>
-
-    <!-- Launcher -->
     <keybind key="W-Space">
       <action name="Execute" command="tofi-drun"/>
     </keybind>
-
-    <!-- Close -->
     <keybind key="W-S-q">
       <action name="Close"/>
     </keybind>
-
-    <!-- Reload -->
     <keybind key="W-C-r">
       <action name="Execute" command="labwc -r"/>
     </keybind>
-
-    <!-- Power menu -->
     <keybind key="W-S-e">
       <action name="Execute" command="~/.config/scripts/tofi-power.sh"/>
     </keybind>
-
-    <!-- Fullscreen -->
     <keybind key="W-f">
       <action name="ToggleFullscreen"/>
     </keybind>
-
-    <!-- Window management -->
-    <keybind key="A-S-Tab">
-      <action name="PreviousWindow"/>
-    </keybind>
-    <keybind key="A-F4">
-      <action name="Close"/>
-    </keybind>
-    <keybind key="W-m">
-      <action name="Iconify"/>
-    </keybind>
-    <keybind key="A-Space">
-      <action name="ToggleFloating"/>
-    </keybind>
-
-    <!-- Snap to edges -->
-    <keybind key="W-Left">
-      <action name="SnapToEdge" direction="left"/>
-    </keybind>
-    <keybind key="W-Right">
-      <action name="SnapToEdge" direction="right"/>
-    </keybind>
-    <keybind key="W-Up">
-      <action name="SnapToEdge" direction="up"/>
-    </keybind>
-    <keybind key="W-Down">
-      <action name="SnapToEdge" direction="down"/>
-    </keybind>
-
-    <!-- Grow to edges -->
     <keybind key="W-C-Left">
       <action name="GrowToEdge" direction="left"/>
     </keybind>
@@ -184,22 +137,18 @@
     <keybind key="W-C-Down">
       <action name="GrowToEdge" direction="down"/>
     </keybind>
-
-    <!-- Snap to regions -->
-    <keybind key="W-S-Left">
-      <action name="SnapToRegion" region="left"/>
+    <keybind key="W-Left">
+      <action name="SnapToEdge" direction="left"/>
     </keybind>
-    <keybind key="W-S-Right">
-      <action name="SnapToRegion" region="right"/>
+    <keybind key="W-Right">
+      <action name="SnapToEdge" direction="right"/>
     </keybind>
-    <keybind key="W-S-Up">
-      <action name="SnapToRegion" region="top"/>
+    <keybind key="W-Up">
+      <action name="SnapToEdge" direction="up"/>
     </keybind>
-    <keybind key="W-S-Down">
-      <action name="SnapToRegion" region="bottom"/>
+    <keybind key="W-Down">
+      <action name="SnapToEdge" direction="down"/>
     </keybind>
-
-    <!-- Workspaces -->
     <keybind key="W-1">
       <action name="GoToDesktop" to="1"/>
     </keybind>
@@ -224,25 +173,56 @@
     <keybind key="W-S-4">
       <action name="SendToDesktop" to="4" follow="yes"/>
     </keybind>
-    <keybind key="W-C-Left">
-      <action name="GoToDesktop" to="left"/>
+    <keybind key="XF86_AudioLowerVolume">
+      <action name="Execute" command="amixer sset Master 5%-"/>
     </keybind>
-    <keybind key="W-C-Right">
-      <action name="GoToDesktop" to="right"/>
+    <keybind key="XF86_AudioRaiseVolume">
+      <action name="Execute" command="amixer sset Master 5%+"/>
     </keybind>
-
-    <!-- Brightness -->
+    <keybind key="XF86_AudioMute">
+      <action name="Execute" command="amixer sset Master toggle"/>
+    </keybind>
     <keybind key="XF86_MonBrightnessUp">
       <action name="Execute" command="brightnessctl set +10%"/>
     </keybind>
     <keybind key="XF86_MonBrightnessDown">
       <action name="Execute" command="brightnessctl set 10%-"/>
     </keybind>
+    <keybind key="W-P">
+      <action name="Execute" command="grim -l 1"/>
+      <action name="Execute" command="notify-send 'Screenshot!'"/>
+    </keybind>
+    <keybind key="XF86FullScreen">
+      <action name="ToggleFullscreen"/>
+    </keybind>
+    <keybind key="W-S-Left">
+      <action name="SnapToRegion" region="top-left"/>
+    </keybind>
+    <keybind key="W-S-Up">
+      <action name="SnapToRegion" region="top-right"/>
+    </keybind>
+    <keybind key="W-S-l">
+      <action name="SnapToRegion" region="left"/>
+    </keybind>
+    <keybind key="W-S-c">
+      <action name="SnapToRegion" region="center"/>
+    </keybind>
+    <keybind key="W-S-a">
+      <action name="SnapToRegion" region="center-big"/>
+    </keybind>
+    <keybind key="W-S-r">
+      <action name="SnapToRegion" region="right"/>
+    </keybind>
+    <keybind key="W-S-Down">
+      <action name="SnapToRegion" region="bottom-left"/>
+    </keybind>
+    <keybind key="W-S-Right">
+      <action name="SnapToRegion" region="bottom-right"/>
+    </keybind>
   </keyboard>
 
   <mouse>
     <doubleClickTime>500</doubleClickTime>
-
     <context name="Frame">
       <mousebind button="A-Left" action="Press">
         <action name="Focus"/>
@@ -259,32 +239,46 @@
         <action name="Resize"/>
       </mousebind>
     </context>
-
     <context name="Top">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="Left">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="Right">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="Bottom">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="TRCorner">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="BRCorner">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="TLCorner">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
     <context name="BLCorner">
-      <mousebind button="Left" action="Drag"><action name="Resize"/></mousebind>
+      <mousebind button="Left" action="Drag">
+        <action name="Resize"/>
+      </mousebind>
     </context>
-
     <context name="TitleBar">
       <mousebind button="Left" action="Press">
         <action name="Focus"/>
@@ -303,7 +297,6 @@
         <action name="Shade"/>
       </mousebind>
     </context>
-
     <context name="Title">
       <mousebind button="Left" action="Drag">
         <action name="Move"/>
@@ -315,7 +308,6 @@
         <action name="ShowMenu" menu="client-menu"/>
       </mousebind>
     </context>
-
     <context name="Maximize">
       <mousebind button="Left" action="Click">
         <action name="ToggleMaximize"/>
@@ -327,7 +319,6 @@
         <action name="ToggleMaximize" direction="vertical"/>
       </mousebind>
     </context>
-
     <context name="WindowMenu">
       <mousebind button="Left" action="Click">
         <action name="ShowMenu" menu="client-menu"/>
@@ -336,19 +327,16 @@
         <action name="ShowMenu" menu="client-menu"/>
       </mousebind>
     </context>
-
     <context name="Iconify">
       <mousebind button="Left" action="Click">
         <action name="Iconify"/>
       </mousebind>
     </context>
-
     <context name="Close">
       <mousebind button="Left" action="Click">
         <action name="Close"/>
       </mousebind>
     </context>
-
     <context name="Client">
       <mousebind button="Left" action="Press">
         <action name="Focus"/>
@@ -363,7 +351,6 @@
         <action name="Raise"/>
       </mousebind>
     </context>
-
     <context name="Root">
       <mousebind button="Left" action="Press">
         <action name="ShowMenu" menu="root-menu"/>
@@ -386,12 +373,16 @@
   <libinput>
     <device category="default">
       <tap>yes</tap>
-      <disableWhileTyping>yes</disableWhileTyping>
       <scrollFactor>1.0</scrollFactor>
     </device>
   </libinput>
 
-  <windowRules/>
+  <windowRules>
+    <windowRule identifier="Firefox">
+      <action name="ToggleDecorations"/>
+      <action name="SnapToRegion" region="center-big"/>
+    </windowRule>
+  </windowRules>
 
   <menu>
     <ignoreButtonReleasePeriod>250</ignoreButtonReleasePeriod>

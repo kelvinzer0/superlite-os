@@ -1,5 +1,5 @@
 #!/bin/sh
-# SuperLite OS — Power menu via tofi (LabWC-Alpine-Netbook style)
+# SuperLite OS — Power Menu via Tofi
 
 case $(printf "%s\n" "Logout" "Reboot" "Suspend" "Shutdown" | tofi -c ~/.config/tofi/config_power $@) in
     "Logout")

@@ -1,23 +1,11 @@
-# SuperLite OS — LabWC environment (LabWC-Alpine-Netbook style)
+# SuperLite OS — LabWC environment
 
-# XDG Desktop Portal
 XDG_CURRENT_DESKTOP=labwc:wlroots
-
-# Wayland
 MOZ_ENABLE_WAYLAND=1
+_JAVA_AWT_WM_NONREPARENTING=1
+XCURSOR_THEME=simp1e-cursors
+XCURSOR_SIZE=20
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 QT_AUTO_SCREEN_SCALE_FACTOR=1
-QT_QPA_PLATFORMTHEME=qt5ct
-QT_PLATFORM_PLUGIN=qt5ct
-QT_PLATFORMTHEME=qt5ct
-
-# Cursor
-XCURSOR_THEME=simp1e-cursors
-XCURSOR_SIZE=20
-
-# Java apps
-_JAVA_AWT_WM_NONREPARENTING=1
-
-# Screenshot dir
 GRIM_DEFAULT_DIR=~/pics/screenshot/

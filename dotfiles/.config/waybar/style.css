@@ -1,7 +1,4 @@
-/*
- * SuperLite OS — Waybar style (LabWC-Alpine-Netbook style)
- * Lemon-chiffon (#FFFACD) + black, Misc OhSnap font
- */
+/* SuperLite OS — Waybar Style (WhiteSur-Light inspired) */
 
 * {
     font-family: Misc Ohsnap, Font Awesome;
@@ -74,15 +71,12 @@ button:hover {
     animation-direction: alternate;
 }
 
-label:focus {
-    background-color: #000000;
-}
-
 #clock {
     margin-right: 5px;
 }
 
-#network.disconnected, #network.disabled {
+#network.disconnected,
+#network.disabled {
     color: gray;
 }
 

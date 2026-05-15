@@ -1,10 +1,16 @@
-# SuperLite OS — .profile
-export XDG_RUNTIME_DIR="/tmp/$(id -u)-runtime-dir"
-mkdir -pm 0700 "$XDG_RUNTIME_DIR" 2>/dev/null
-export XDG_RUNTIME_DIR
+# SuperLite OS — User Profile
+
+if test -z "${XDG_RUNTIME_DIR}"; then
+  export XDG_RUNTIME_DIR=/tmp/$(id -u)-runtime-dir
+  if ! test -d "${XDG_RUNTIME_DIR}"; then
+    mkdir "${XDG_RUNTIME_DIR}"
+    chmod 0700 "${XDG_RUNTIME_DIR}"
+  fi
+fi
+
 export XDG_SESSION_TYPE=wayland
-export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland,x11
 
 # Auto-start LabWC on tty1

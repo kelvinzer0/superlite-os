@@ -1,0 +1,47 @@
+{
+    "layer": "bottom",
+    "position": "bottom",
+    "height": 28,
+    "margin": "0 4 4 4",
+    "spacing": 12,
+    "modules-left": ["wlr/taskbar"],
+    "modules-right": ["clock", "network", "battery"],
+
+    "wlr/taskbar": {
+        "format": "{name}",
+        "icon-size": 18,
+        "icon-theme": "Haiku",
+        "on-click": "minimize-raise",
+        "on-click-middle": "close",
+        "rewrite": {
+            "Firefox": "",
+            "Foot": "🗖",
+            "File Manager PCManFM": ""
+        }
+    },
+
+    "clock": {
+        "format-alt": "<span text-transform='uppercase'>{:%H:%M}</span>",
+        "format": "<span text-transform='uppercase'>{:%a %d %b<span color='#666'>,</span> %H:%M}</span>",
+        "tooltip": false
+    },
+
+    "network": {
+        "format": "",
+        "tooltip-format": "{essid} [{signalStrength}%]",
+        "on-click": "sudo nmcli networking connectivity | grep -q none && sudo nmcli networking on && notify-send 'Wi-Fi Radio On' || sudo nmcli networking off",
+        "on-click-right": "foot sudo nmtui"
+    },
+
+    "battery": {
+        "states": {
+            "warning": 15,
+            "critical": 5
+        },
+        "format": "{icon}",
+        "format-charging": "",
+        "format-plugged": "",
+        "format-icons": ["", "", "", "", ""],
+        "tooltip-format": "{power}W - {capacity}%"
+    }
+}
