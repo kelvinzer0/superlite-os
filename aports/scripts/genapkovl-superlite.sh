@@ -107,8 +107,6 @@ rc_add dbus default
 rc_add networkmanager default
 rc_add chronyd default
 rc_add sshd default
-rc_add agetty.tty1 default
-rc_add agetty.ttyS0 default
 
 rc_add mount-ro shutdown
 rc_add killprocs shutdown
@@ -144,6 +142,8 @@ makefile root:root 0644 "$tmp"/etc/inittab <<'EOF'
 ::sysinit:/sbin/openrc sysinit
 ::shutdown:/sbin/openrc shutdown
 ::ctrlaltdel:/sbin/reboot
+tty1::respawn:/sbin/agetty --autologin root --noclear 38400 tty1
+ttyS0::respawn:/sbin/agetty --autologin root 115200 ttyS0 vt100
 EOF
 
 # ── Create live user ──────────────────────────────────────────────────────────
