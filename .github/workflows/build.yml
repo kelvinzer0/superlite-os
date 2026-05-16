@@ -32,58 +32,132 @@ jobs:
         run: |
           ISO=$(find output -name "*.iso" -type f | head -1)
           echo "Testing ISO: $ISO"
-          
-          # Install QEMU
+
+          # Install QEMU + expect
           sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf >/dev/null
-          
-          # Boot ISO in QEMU (headless, serial console, timeout 120s)
-          echo "Booting ISO in QEMU (serial console)..."
-          timeout 120 qemu-system-x86_64 \
+          sudo apt-get install -y -qq qemu-system-x86 qemu-utils ovmf expect >/dev/null
+
+          # Write expect script for interactive boot test
+          cat > /tmp/qemu-test.exp << 'EXPECT_SCRIPT'
+          #!/usr/bin/expect -f
+          set timeout 180
+
+          # Start QEMU
+          spawn qemu-system-x86_64 \
             -m 1024 \
             -nographic \
             -no-reboot \
-            -cdrom "$ISO" \
+            -cdrom $env(ISO_PATH) \
             -boot d \
-            -serial mon:stdio \
-            2>&1 | tee /tmp/qemu-boot.log &
-          
-          QEMU_PID=$!
-          
-          # Wait for boot (check for login prompt or kernel messages)
-          echo "Waiting for boot..."
-          BOOT_OK=false
-          for i in $(seq 1 60); do
-            sleep 2
-            if grep -qiE "(login:|Welcome to SuperLite|Alpine Linux|superlite)" /tmp/qemu-boot.log 2>/dev/null; then
-              echo "✓ Boot successful! System reached login prompt."
-              BOOT_OK=true
-              break
-            fi
-            # Check for kernel panic
-            if grep -qi "kernel panic" /tmp/qemu-boot.log 2>/dev/null; then
-              echo "✗ Kernel panic detected!"
-              break
-            fi
-            echo "  Waiting... ($i/60)"
-          done
-          
-          # Cleanup
-          kill $QEMU_PID 2>/dev/null || true
-          wait $QEMU_PID 2>/dev/null || true
-          
-          # Show last 30 lines of boot log
-          echo ""
-          echo "=== Boot Log (last 30 lines) ==="
-          tail -30 /tmp/qemu-boot.log
-          echo "================================"
-          
-          if [ "$BOOT_OK" = true ]; then
+            -serial mon:stdio
+
+          # Wait for login prompt (auto-login will kick in)
+          expect {
+            -re "login:" {
+              # Auto-login should happen, but send enter just in case
+              send "\r"
+            }
+            "Kernel panic" {
+              puts "\n✗ FAIL: Kernel panic detected"
+              exit 1
+            }
+            timeout {
+              puts "\n✗ FAIL: Boot timeout (180s)"
+              exit 1
+            }
+          }
+
+          # Wait for root shell prompt (indicates successful auto-login)
+          expect {
+            -re {(localhost|superlite)[^#]*# } {
+              puts "\n✓ Auto-login successful — root shell ready"
+            }
+            timeout {
+              puts "\n✗ FAIL: No shell prompt after login"
+              exit 1
+            }
+          }
+
+          # ── Diagnostic Commands ─────────────────────────────
+          set test_passed 1
+
+          # 1. Check kernel version
+          send "uname -a\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 2. Check running services
+          send "rc-status --no-color 2>&1 | head -30\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 3. Check for failed services
+          send "rc-status --no-color 2>&1 | grep -i crashed || echo 'No crashed services'\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 4. Check disk/filesystem
+          send "df -h 2>&1 | head -10\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 5. Check key packages installed
+          send "apk info --no-color 2>&1 | grep -cE '(labwc|seatd|dbus|foot|waybar)' \r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 6. Check seatd is running (required for Wayland)
+          send "rc-service seatd status 2>&1 || true\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 7. Check dbus is running
+          send "rc-service dbus status 2>&1 || true\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 8. Check /root/.profile exists (LabWC autostart)
+          send "test -f /root/.profile && echo 'profile: OK' || echo 'profile: MISSING'\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 9. Check WLR_LIBINPUT_NO_DEVICES is set
+          send "grep -q WLR_LIBINPUT_NO_DEVICES /root/.profile && echo 'libinput fix: OK' || echo 'libinput fix: MISSING'\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 10. Check dmesg for critical errors (ignore warnings)
+          send "dmesg 2>&1 | grep -iE '(panic|oops|bug:|error)' | grep -iv 'warning' | head -5 || echo 'dmesg: clean'\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 11. Verify LabWC binary exists
+          send "which labwc 2>&1 && labwc --version 2>&1 || echo 'labwc: NOT FOUND'\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # 12. Quick network check
+          send "ip link show 2>&1 | head -10\r"
+          expect -re {(localhost|superlite)[^#]*# }
+
+          # All done
+          send "echo '\\n=== SMOKE TEST COMPLETE ==='\r"
+          expect "=== SMOKE TEST COMPLETE ==="
+
+          puts "\n✓ All diagnostic checks completed"
+
+          # Graceful shutdown
+          send "poweroff\r"
+          expect eof
+
+          puts "\n✓ QEMU smoke test PASSED"
+          exit 0
+          EXPECT_SCRIPT
+
+          chmod +x /tmp/qemu-test.exp
+
+          # Run the test
+          export ISO_PATH="$ISO"
+          echo "Booting ISO in QEMU (expect-based interactive test)..."
+          if expect /tmp/qemu-test.exp 2>&1 | tee /tmp/qemu-boot.log; then
             echo ""
             echo "✓ QEMU smoke test PASSED"
           else
             echo ""
-            echo "✗ QEMU smoke test FAILED — no login prompt detected"
+            echo "=== Boot Log (last 50 lines) ==="
+            tail -50 /tmp/qemu-boot.log
+            echo "================================="
+            echo ""
+            echo "✗ QEMU smoke test FAILED"
             exit 1
           fi
 
