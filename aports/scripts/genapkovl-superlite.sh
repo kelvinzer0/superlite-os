@@ -113,19 +113,26 @@ rc_add mount-ro shutdown
 rc_add killprocs shutdown
 rc_add savecache shutdown
 
+# ── Auto-login wrapper (busybox getty doesn't support --autologin) ─────────
+mkdir -p "$tmp"/usr/sbin
+makefile root:root 0755 "$tmp"/usr/sbin/autologin <<'EOF'
+#!/bin/sh
+exec login -f root
+EOF
+
 # ── Auto-login on tty1 ────────────────────────────────────────────────────────
 mkdir -p "$tmp"/etc/conf.d
 makefile root:root 0644 "$tmp"/etc/conf.d/agetty.tty1 <<EOF
 BAUDRATE="115200"
 TERM="xterm-256color"
-GETTY_ARGS="--autologin root --noclear"
+GETTY_ARGS="-n -l /usr/sbin/autologin --noclear"
 EOF
 
 # ── Auto-login on serial console ──────────────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/conf.d/agetty.ttyS0 <<EOF
 BAUDRATE="115200"
 TERM="linux"
-GETTY_ARGS="--autologin root --noclear"
+GETTY_ARGS="-n -l /usr/sbin/autologin --noclear"
 EOF
 
 # ── Create live user ──────────────────────────────────────────────────────────
