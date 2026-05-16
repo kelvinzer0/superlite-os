@@ -138,12 +138,21 @@ EOF
 
 # ── Override /etc/inittab — disable busybox getty, use agetty service only ────
 makefile root:root 0644 "$tmp"/etc/inittab <<'EOF'
-# SuperLite OS — OpenRC manages services, agetty handles TTYs
 ::sysinit:/sbin/openrc sysinit
-::shutdown:/sbin/openrc shutdown
-::ctrlaltdel:/sbin/reboot
-tty1::respawn:/sbin/agetty --autologin root --noclear 38400 tty1
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
+
+tty1::respawn:/sbin/agetty --autologin root --noclear 38400 tty1 linux
+tty2::respawn:/sbin/agetty 38400 tty2 linux
+tty3::respawn:/sbin/agetty 38400 tty3 linux
+tty4::respawn:/sbin/agetty 38400 tty4 linux
+tty5::respawn:/sbin/agetty 38400 tty5 linux
+tty6::respawn:/sbin/agetty 38400 tty6 linux
+
 ttyS0::respawn:/sbin/agetty --autologin root 115200 ttyS0 vt100
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/sbin/openrc shutdown
 EOF
 
 # ── Create live user ──────────────────────────────────────────────────────────
