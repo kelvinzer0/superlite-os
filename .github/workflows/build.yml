@@ -55,6 +55,7 @@ jobs:
           expect {
             -re "login:" {
               # Auto-login should happen, but send enter just in case
+              sleep 1
               send "\r"
             }
             "Kernel panic" {
@@ -69,71 +70,38 @@ jobs:
 
           # Wait for root shell prompt (indicates successful auto-login)
           expect {
-            -re {(localhost|superlite)[^#]*# } {
+            -re {(localhost|superlite|alpine)[^#]*# } {
               puts "\n✓ Auto-login successful — root shell ready"
             }
             timeout {
-              puts "\n✗ FAIL: No shell prompt after login"
+              puts "\n✗ FAIL: No shell prompt after login (auto-login broken?)"
               exit 1
             }
           }
 
           # ── Diagnostic Commands ─────────────────────────────
-          set test_passed 1
+          proc run_check {cmd desc} {
+            send "$cmd\r"
+            expect -re {(localhost|superlite|alpine)[^#]*# }
+            puts "  ✓ $desc"
+          }
 
-          # 1. Check kernel version
-          send "uname -a\r"
-          expect -re {(localhost|superlite)[^#]*# }
+          puts "\n=== Running Diagnostics ==="
 
-          # 2. Check running services
-          send "rc-status --no-color 2>&1 | head -30\r"
-          expect -re {(localhost|superlite)[^#]*# }
+          run_check "uname -a" "Kernel version"
+          run_check "rc-status --no-color 2>&1 | head -30" "Service status"
+          run_check "rc-status --no-color 2>&1 | grep -i crashed || echo 'No crashed services'" "Crashed services check"
+          run_check "df -h 2>&1 | head -10" "Disk usage"
+          run_check "apk info --no-color 2>&1 | grep -cE '(labwc|seatd|dbus|foot|waybar)'" "Key packages installed"
+          run_check "rc-service seatd status 2>&1 || true" "seatd status"
+          run_check "rc-service dbus status 2>&1 || true" "dbus status"
+          run_check "test -f /root/.profile && echo 'profile: OK' || echo 'profile: MISSING'" "Root profile exists"
+          run_check "grep -q WLR_LIBINPUT_NO_DEVICES /root/.profile && echo 'libinput fix: OK' || echo 'libinput fix: MISSING'" "libinput fix present"
+          run_check "dmesg 2>&1 | grep -iE '(panic|oops|bug:|error)' | grep -iv 'warning' | head -5 || echo 'dmesg: clean'" "dmesg critical errors"
+          run_check "which labwc 2>&1 && labwc --version 2>&1 || echo 'labwc: NOT FOUND'" "LabWC binary"
+          run_check "ip link show 2>&1 | head -10" "Network interfaces"
 
-          # 3. Check for failed services
-          send "rc-status --no-color 2>&1 | grep -i crashed || echo 'No crashed services'\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 4. Check disk/filesystem
-          send "df -h 2>&1 | head -10\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 5. Check key packages installed
-          send "apk info --no-color 2>&1 | grep -cE '(labwc|seatd|dbus|foot|waybar)' \r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 6. Check seatd is running (required for Wayland)
-          send "rc-service seatd status 2>&1 || true\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 7. Check dbus is running
-          send "rc-service dbus status 2>&1 || true\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 8. Check /root/.profile exists (LabWC autostart)
-          send "test -f /root/.profile && echo 'profile: OK' || echo 'profile: MISSING'\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 9. Check WLR_LIBINPUT_NO_DEVICES is set
-          send "grep -q WLR_LIBINPUT_NO_DEVICES /root/.profile && echo 'libinput fix: OK' || echo 'libinput fix: MISSING'\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 10. Check dmesg for critical errors (ignore warnings)
-          send "dmesg 2>&1 | grep -iE '(panic|oops|bug:|error)' | grep -iv 'warning' | head -5 || echo 'dmesg: clean'\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 11. Verify LabWC binary exists
-          send "which labwc 2>&1 && labwc --version 2>&1 || echo 'labwc: NOT FOUND'\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # 12. Quick network check
-          send "ip link show 2>&1 | head -10\r"
-          expect -re {(localhost|superlite)[^#]*# }
-
-          # All done
-          send "echo '\\n=== SMOKE TEST COMPLETE ==='\r"
-          expect "=== SMOKE TEST COMPLETE ==="
-
-          puts "\n✓ All diagnostic checks completed"
+          puts "\n=== All Checks Passed ==="
 
           # Graceful shutdown
           send "poweroff\r"

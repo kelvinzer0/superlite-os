@@ -17,7 +17,8 @@ profile_superlite() {
     "
 
     # Exclude conflicting vlan package (breaks ifupdown-ng in edge)
-    apks="$apks !vlan
+    # Exclude shadow-login — breaks agetty --autologin (asks for nonexistent password)
+    apks="$apks !vlan !shadow-login
     "
 
     apks="$apks
