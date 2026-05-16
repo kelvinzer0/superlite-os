@@ -15,7 +15,6 @@ busybox-extras
 kmod
 
 # --- Kernel + Targeted Firmware ---
-linux-virt
 linux-lts
 linux-firmware-i915
 linux-firmware-amdgpu
@@ -35,8 +34,12 @@ mesa-dri-gallium
 mesa-egl
 mesa-gl
 mesa-gbm
+mesa-va-gallium
 seatd
+elogind
 dbus
+dbus-x11
+xwayland
 
 # --- Desktop Components (LabWC-Alpine-Netbook style) ---
 waybar
@@ -48,10 +51,26 @@ gammastep
 brightnessctl
 gsettings-desktop-schemas
 
+# --- Audio ---
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+
 # --- Fonts & Cursors ---
 font-awesome
 font-terminus
+font-dejavu
+font-jetbrains-mono
+font-tamzen
 simp1e-cursors
+
+# --- Desktop Tools ---
+libnotify
+polkit
+grim
+slurp
+wtype
 
 # --- Networking ---
 networkmanager

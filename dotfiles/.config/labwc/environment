@@ -1,10 +1,5 @@
-#
-# ~/.bashrc
-#
-# Riccardo Palombo - https://riccardo.im
-# Preparato per la community Patreon: patreon.com/riccardopalombo
-# Qualche alias utile (bisogna installare exa!)
-#
+# LabWC Environment Configuration
+# SuperLite OS — Alpine Linux + LabWC Wayland
 
 # This allows xdg-desktop-portal-wlr to function (e.g. for screen-recording)
 XDG_CURRENT_DESKTOP=labwc:wlroots
@@ -21,7 +16,7 @@ MOZ_ENABLE_WAYLAND=1
 
 # Disable hardware cursors. Most users wouldn't want to do this, but if you
 # are experiencing issues with disappearing cursors, this might fix it.
-# WLR_NO_HARDWARE_CURSORS=1
+WLR_NO_HARDWARE_CURSORS=1
 
 # For Java applications such as JetBrains/Intellij Idea, set this variable
 # to avoid menus with incorrect offset and blank windows
@@ -30,11 +25,15 @@ MOZ_ENABLE_WAYLAND=1
 _JAVA_AWT_WM_NONREPARENTING=1
 XCURSOR_THEME=simp1e-cursors
 XCURSOR_SIZE=20
-XKB_DEFAULT_LAYOUT=it
+XKB_DEFAULT_LAYOUT=us
 BROWSER=firefox
 EDITOR=micro
-LIBVA_DRIVER_NAME=i965
-VDPAU_DRIVER=va_gl
+
+# Auto-detect GPU — don't hardcode Intel/AMD
+# Let Mesa/VA-API auto-detect the correct driver
+# Uncomment ONLY if auto-detection fails:
+#LIBVA_DRIVER_NAME=i965
+#VDPAU_DRIVER=va_gl
 
 QT_QPA_PLATFORMTHEME=qt5ct
 QT_PLATFORM_PLUGIN=qt5ct

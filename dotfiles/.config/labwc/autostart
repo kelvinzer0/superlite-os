@@ -1,12 +1,5 @@
-#
-# ~/.bashrc
-#
-# Riccardo Palombo - https://riccardo.im
-# Preparato per la community Patreon: patreon.com/riccardopalombo
-# Qualche alias utile (bisogna installare exa!)
-#
-
 # LabWC autostart file
+# SuperLite OS — autostart services on session launch
 
 #swaybg -i pics/pattern.png -m tile -c f898d0 >/dev/null 2>&1 &
 swaybg -i pics/wool-linux.png -m center >/dev/null 2>&1 &
@@ -16,7 +9,7 @@ gammastep -O 5600 2>&1 &
 swayidle -w timeout 600 'sudo zzz' 2>&1 &
 brightnessctl set 80% 2>&1 &
 
-#/usr/libexec/pipewire-launcher 2>&1 &
+/usr/libexec/pipewire-launcher 2>&1 &
 #udiskie 2>&1 &
 
 gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light' 2>&1 &

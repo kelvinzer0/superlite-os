@@ -60,13 +60,29 @@ openrc
 busybox
 busybox-suid
 busybox-static
+busybox-extras
 kmod
 linux-lts
+linux-firmware-i915
+linux-firmware-amdgpu
+linux-firmware-amd-ucode
+linux-firmware-ath10k
+linux-firmware-rtlwifi
+linux-firmware-rtw89
+linux-firmware-rtl_bt
+linux-firmware-brcm
+linux-firmware-cirrus
+linux-firmware-other
 agetty
 labwc
 foot
 mesa-dri-gallium
+mesa-egl
+mesa-gl
+mesa-gbm
+mesa-va-gallium
 seatd
+elogind
 dbus
 dbus-x11
 waybar
@@ -78,11 +94,24 @@ brightnessctl
 networkmanager
 font-awesome
 font-terminus
+font-dejavu
+font-jetbrains-mono
+font-tamzen
 simp1e-cursors
 gsettings-desktop-schemas
 gammastep
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+libnotify
+polkit
 sudo
 lua5.4
+xwayland
+grim
+slurp
+wtype
 EOF
 
 # ── OpenRC services ───────────────────────────────────────────────────────────
@@ -103,7 +132,9 @@ rc_add urandom boot
 rc_add keymaps boot
 
 rc_add seatd default
+rc_add elogind default
 rc_add dbus default
+rc_add polkitd default
 rc_add networkmanager default
 rc_add chronyd default
 rc_add sshd default
@@ -161,6 +192,43 @@ makefile root:root 0440 "$tmp"/etc/sudoers.d/live <<EOF
 live ALL=(ALL) NOPASSWD: ALL
 EOF
 
+# ── Seat/input group setup ────────────────────────────────────────────────────
+# Create groups needed for seat management and input devices
+mkdir -p "$tmp"/etc
+makefile root:root 0644 "$tmp"/etc/group <<'EOF'
+root:x:0:root
+bin:x:1:root,bin,daemon
+daemon:x:2:root,bin,daemon
+sys:x:3:root,bin,adm
+adm:x:4:root,adm,daemon
+tty:x:5:
+disk:x:6:root,adm
+lp:x:7:daemon
+mem:x:9:
+kmem:x:10:
+wheel:x:11:root
+floppy:x:11:root
+mail:x:12:postfix
+news:x:13:
+uucp:x:14:
+audio:x:15:root
+cdrom:x:16:root
+dialout:x:18:root
+ftp:x:21:
+sshd:x:22:
+input:x:23:root
+kvm:x:34:root
+video:x:36:root
+games:x:35:
+usb:x:43:
+adm:x:4:root,adm,daemon
+disk:x:6:root,adm
+seat:x:480:root
+seatd:x:481:root
+messagebus:x:482:
+polkitd:x:483:
+EOF
+
 # ── Copy dotfiles to skel + root ──────────────────────────────────────────────
 # NOTE: Dotfiles are copied FIRST, then overlay files below overwrite as needed
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -182,11 +250,20 @@ export XDG_RUNTIME_DIR="/tmp/$(id -u)-runtime-dir"
 mkdir -pm 0700 "$XDG_RUNTIME_DIR" 2>/dev/null
 export XDG_RUNTIME_DIR
 export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=wlroots
 export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
+
 # Suppress libinput error in VMs (QEMU, no physical input devices)
 export WLR_LIBINPUT_NO_DEVICES=1
+
+# Auto-detect GPU driver (don't hardcode Intel)
+unset LIBVA_DRIVER_NAME
+unset VDPAU_DRIVER
+
+# Ensure seatd socket is accessible
+export XDG_SEAT=seat0
 EOF
 
 # ── LabWC auto-start for root (AFTER dotfiles to prevent overwrite) ──────────
@@ -198,6 +275,7 @@ mkdir -pm 0700 "$XDG_RUNTIME_DIR" 2>/dev/null
 export XDG_RUNTIME_DIR
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=wlroots
+export XDG_SEAT=seat0
 export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
@@ -205,12 +283,22 @@ export GDK_BACKEND=wayland,x11
 # Suppress libinput error in VMs (QEMU, no physical input devices)
 [ -z "$WLR_LIBINPUT_NO_DEVICES" ] && export WLR_LIBINPUT_NO_DEVICES=1
 
+# Auto-detect GPU driver
+unset LIBVA_DRIVER_NAME
+unset VDPAU_DRIVER
+
 # Source aliases from dotfiles if available
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
 
 # Auto-start LabWC on tty1
 if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec dbus-launch --exit-with-session labwc
+    # Ensure seatd is running
+    if ! pgrep -x seatd >/dev/null 2>&1; then
+        sudo rc-service seatd start 2>/dev/null || true
+        sleep 1
+    fi
+    # Start LabWC with dbus session
+    exec dbus-run-session --exit-with-session labwc
 fi
 EOF
 
