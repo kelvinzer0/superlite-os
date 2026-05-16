@@ -26,6 +26,7 @@ profile_superlite() {
         linux-firmware-i915 linux-firmware-amdgpu linux-firmware-amd-ucode
         linux-firmware-ath10k linux-firmware-rtlwifi linux-firmware-rtw89
         linux-firmware-rtl_bt linux-firmware-brcm linux-firmware-cirrus linux-firmware-other
+        agetty
         labwc labwc-doc foot mesa-dri-gallium mesa-egl mesa-gl mesa-gbm
         mesa-va-gallium seatd dbus dbus-x11
         waybar swaybg swayidle mako tofi gammastep brightnessctl

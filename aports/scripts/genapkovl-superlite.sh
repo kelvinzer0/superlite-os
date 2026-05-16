@@ -62,6 +62,7 @@ busybox-suid
 busybox-static
 kmod
 linux-lts
+agetty
 labwc
 foot
 mesa-dri-gallium
