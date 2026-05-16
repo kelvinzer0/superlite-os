@@ -114,26 +114,36 @@ rc_add mount-ro shutdown
 rc_add killprocs shutdown
 rc_add savecache shutdown
 
-# ── Auto-login wrapper (busybox getty doesn't support --autologin) ─────────
+# ── Auto-login wrapper (for busybox getty fallback) ─────────────────────────
 mkdir -p "$tmp"/usr/sbin
 makefile root:root 0755 "$tmp"/usr/sbin/autologin <<'EOF'
 #!/bin/sh
 exec login -f root
 EOF
 
+# ── securetty — allow root login on these terminals ──────────────────────────
+makefile root:root 0644 "$tmp"/etc/securetty <<'EOF'
+tty1
+ttyS0
+EOF
+
 # ── Auto-login on tty1 ────────────────────────────────────────────────────────
 mkdir -p "$tmp"/etc/conf.d
 makefile root:root 0644 "$tmp"/etc/conf.d/agetty.tty1 <<EOF
-BAUDRATE="115200"
-TERM="xterm-256color"
-GETTY_ARGS="-n -l /usr/sbin/autologin --noclear"
+GETTY_ARGS="--autologin root --noclear 115200 tty1"
 EOF
 
 # ── Auto-login on serial console ──────────────────────────────────────────────
 makefile root:root 0644 "$tmp"/etc/conf.d/agetty.ttyS0 <<EOF
-BAUDRATE="115200"
-TERM="linux"
-GETTY_ARGS="-n -l /usr/sbin/autologin --noclear"
+GETTY_ARGS="--autologin root --noclear 115200 ttyS0"
+EOF
+
+# ── Override /etc/inittab — disable busybox getty, use agetty service only ────
+makefile root:root 0644 "$tmp"/etc/inittab <<'EOF'
+# SuperLite OS — OpenRC manages services, agetty handles TTYs
+::sysinit:/sbin/openrc sysinit
+::shutdown:/sbin/openrc shutdown
+::ctrlaltdel:/sbin/reboot
 EOF
 
 # ── Create live user ──────────────────────────────────────────────────────────
