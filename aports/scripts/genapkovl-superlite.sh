@@ -158,6 +158,8 @@ export XDG_SESSION_TYPE=wayland
 export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
+# Suppress libinput error in VMs (QEMU, no physical input devices)
+export WLR_LIBINPUT_NO_DEVICES=1
 EOF
 
 # ── LabWC auto-start for root (AFTER dotfiles to prevent overwrite) ──────────
@@ -172,6 +174,9 @@ export XDG_CURRENT_DESKTOP=wlroots
 export QT_QPA_PLATFORM=wayland
 export MOZ_ENABLE_WAYLAND=1
 export GDK_BACKEND=wayland,x11
+
+# Suppress libinput error in VMs (QEMU, no physical input devices)
+[ -z "$WLR_LIBINPUT_NO_DEVICES" ] && export WLR_LIBINPUT_NO_DEVICES=1
 
 # Source aliases from dotfiles if available
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
