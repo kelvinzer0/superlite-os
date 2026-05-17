@@ -26,6 +26,8 @@ linux-firmware-rtl_bt
 linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
+udev
+xf86-input-libinput firefox
 
 # --- Wayland Desktop ---
 labwc
@@ -40,6 +42,7 @@ elogind
 dbus
 dbus-x11
 xwayland
+
 
 # --- Desktop Components (LabWC-Alpine-Netbook style) ---
 waybar
