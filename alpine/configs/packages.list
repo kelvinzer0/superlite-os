@@ -84,7 +84,7 @@ font-tamzen
 simp1e-cursors
 
 # --- Desktop Tools ---
-agetty
+util-linux
 libnotify
 polkit
 grim
