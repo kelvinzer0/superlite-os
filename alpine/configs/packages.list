@@ -13,6 +13,20 @@ busybox-suid
 busybox-static
 busybox-extras
 kmod
+pcmanfm
+imv
+mpv
+wf-recorder
+lxappearance
+qt5ct
+micro
+helix
+lazygit
+bluez
+tlp
+shadow
+shadow-login
+sudo
 
 # --- Kernel + Targeted Firmware ---
 linux-lts
@@ -70,6 +84,7 @@ font-tamzen
 simp1e-cursors
 
 # --- Desktop Tools ---
+agetty
 libnotify
 polkit
 grim
@@ -78,6 +93,9 @@ wtype
 
 # --- Networking ---
 networkmanager
+networkmanager-cli
+networkmanager-tui
+networkmanager-wifi
 
 # --- Boot (ISO only, not runtime) ---
 grub-efi
