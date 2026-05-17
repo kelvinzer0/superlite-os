@@ -305,6 +305,7 @@ esac
 BOOTMODE_EOF
 
 # ── Boot menu (fallback if no cmdline param) ──────────────────────────────────
+mkdir -p "$tmp"/usr/local/bin
 makefile root:root 0755 "$tmp"/usr/local/bin/superlite-menu <<'MENU_EOF'
 #!/bin/sh
 # SuperLite OS — Boot Mode Menu
