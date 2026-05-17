@@ -106,7 +106,8 @@ networkmanager-tui
 networkmanager-wifi
 
 # --- VPN (Cloudflare WARP) ---
-cloudflare-warp
+wireguard-tools
+wgcf
 
 # --- Email ---
 thunderbird

@@ -33,13 +33,13 @@
 
 	<menu id="Vpn" label="VPN">
 	<item label="Connect">
-		<action name="Execute"><command>warp-cli connect</command></action>
+		<action name="Execute"><command>wg-quick up wgcf-profile</command></action>
 	</item>
 	<item label="Disconnect">
-		<action name="Execute"><command>warp-cli disconnect</command></action>
+		<action name="Execute"><command>wg-quick down wgcf-profile</command></action>
 	</item>
-	<item label="Network Manager Config">
-		<action name="Execute"><command>nm-connection-editor</command></action>
+	<item label="Register WARP">
+		<action name="Execute"><command>foot -e sh -c "wgcf register; wgcf generate; echo Done; read"</command></action>
 	</item>
 	</menu>
 </menu> <!-- root-menu -->
