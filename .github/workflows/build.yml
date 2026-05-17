@@ -2,6 +2,17 @@ name: Build SuperLite OS ISO
 
 on:
   workflow_dispatch:
+    inputs:
+      variant:
+        description: 'ISO variant to build'
+        required: false
+        default: 'superlite-unified'
+        type: choice
+        options:
+          - superlite-unified
+          - superlite
+          - superlite-install
+          - superlite-parted
 
 jobs:
   build:
@@ -15,14 +26,15 @@ jobs:
 
       - name: Build ISO in Docker
         run: |
+          VARIANT="${{ github.event.inputs.variant || 'superlite-unified' }}"
           chmod +x ./build.sh
-          ./build.sh --docker --tag "${GITHUB_SHA::8}"
+          ./build.sh --docker --variant "$VARIANT" --tag "${GITHUB_SHA::8}"
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: superlite-os-iso
-          path: output/*.iso
+          path: output/**/*.iso
           retention-days: 14
 
       - name: QEMU Smoke Test
@@ -51,7 +63,6 @@ jobs:
           # Wait for login prompt (auto-login will kick in)
           expect {
             -re "login:" {
-              # Auto-login should happen, but send enter just in case
               sleep 1
               send "\r"
             }
@@ -65,13 +76,29 @@ jobs:
             }
           }
 
-          # Wait for root shell prompt (indicates successful auto-login)
+          # After auto-login, unified ISO shows boot menu or shell
+          # Handle both: menu (choose 4=shell) or direct shell
           expect {
+            -re "Choose \\[1-4\\]:" {
+              puts "\n  Boot menu detected — selecting Shell (4)"
+              send "4\r"
+            }
             -re {(localhost|superlite|alpine)[^#]*# } {
-              puts "\n✓ Auto-login successful — root shell ready"
+              puts "\n  Direct shell prompt (legacy ISO or desktop mode)"
             }
             timeout {
-              puts "\n✗ FAIL: No shell prompt after login (auto-login broken?)"
+              puts "\n✗ FAIL: No menu or shell after login"
+              exit 1
+            }
+          }
+
+          # Wait for root shell prompt
+          expect {
+            -re {(localhost|superlite|alpine)[^#]*# } {
+              puts "\n✓ Shell ready — root auto-login successful"
+            }
+            timeout {
+              puts "\n✗ FAIL: No shell prompt"
               exit 1
             }
           }
@@ -89,11 +116,15 @@ jobs:
           run_check "rc-status --no-color 2>&1 | head -30" "Service status"
           run_check "rc-status --no-color 2>&1 | grep -i crashed || echo 'No crashed services'" "Crashed services check"
           run_check "df -h 2>&1 | head -10" "Disk usage"
-          run_check "apk info --no-color 2>&1 | grep -cE '(labwc|seatd|dbus|foot|waybar)'" "Key packages installed"
+          run_check "apk info --no-color 2>&1 | grep -cE '(labwc|seatd|dbus|foot|waybar|parted|partman)'" "Key packages installed"
           run_check "rc-service seatd status 2>&1 || true" "seatd status"
           run_check "rc-service dbus status 2>&1 || true" "dbus status"
           run_check "test -f /root/.profile && echo 'profile: OK' || echo 'profile: MISSING'" "Root profile exists"
-          run_check "grep -q WLR_LIBINPUT_NO_DEVICES /root/.profile && echo 'libinput fix: OK' || echo 'libinput fix: MISSING'" "libinput fix present"
+          run_check "test -f /usr/local/bin/partman && echo 'partman: OK' || echo 'partman: MISSING'" "Partition manager"
+          run_check "test -f /usr/local/bin/superlite-installer && echo 'installer: OK' || echo 'installer: MISSING'" "Installer"
+          run_check "test -f /usr/local/bin/superlite-menu && echo 'menu: OK' || echo 'menu: MISSING'" "Boot menu"
+          run_check "test -f /etc/profile.d/00-boot-mode.sh && echo 'boot-mode: OK' || echo 'boot-mode: MISSING'" "Boot mode script"
+          run_check "grep -q 'superlite.mode' /etc/profile.d/00-boot-mode.sh && echo 'mode detection: OK' || echo 'mode detection: MISSING'" "Mode detection"
           run_check "dmesg 2>&1 | grep -iE '(panic|oops|bug:|error)' | grep -iv 'warning' | head -5 || echo 'dmesg: clean'" "dmesg critical errors"
           run_check "which labwc 2>&1 && labwc --version 2>&1 || echo 'labwc: NOT FOUND'" "LabWC binary"
           run_check "ip link show 2>&1 | head -10" "Network interfaces"
@@ -130,5 +161,5 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: output/*.iso
+          files: output/**/*.iso
           generate_release_notes: true
