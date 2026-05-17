@@ -1,0 +1,81 @@
+# ============================================================================
+# SuperLite OS — Disk Partition Management ISO
+# Minimal bootable environment for partition CRUD operations
+# No desktop — pure terminal tools
+# ============================================================================
+
+# --- Base ---
+alpine-base
+openrc
+busybox
+busybox-suid
+busybox-static
+busybox-extras
+kmod
+shadow
+shadow-login
+sudo
+bash
+less
+
+# --- Disk Partition Tools ---
+parted
+gdisk
+fdisk
+sfdisk
+cfdisk
+sgdisk
+dosfstools
+btrfs-progs
+e2fsprogs
+e2fsprogs-extra
+ntfs-3g
+xfsprogs
+f2fs-tools
+lvm2
+mdadm
+smartmontools
+hdparm
+lsblk
+util-linux
+wipefs
+blkid
+findmnt
+hdparm
+sdparm
+nvme-cli
+hd-idle
+
+# --- Filesystem Tools ---
+nfs-utils
+cifs-utils
+sshfs
+fuse3
+
+# --- Kernel (minimal) ---
+linux-lts
+udev
+eudev
+
+# --- Networking (for remote management) ---
+networkmanager
+networkmanager-cli
+openssh
+openssh-client
+openssh-server
+
+# --- TUI Tools ---
+micro
+helix
+lazygit
+
+# --- Boot (ISO only) ---
+grub-efi
+grub-bios
+syslinux
+squashfs-tools
+xorriso
+mkinitfs
+mtools
+dosfstools
+lua5.4

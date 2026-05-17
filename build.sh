@@ -20,6 +20,7 @@ OUTPUT=""
 SETUP_ONLY=false
 USE_DOCKER=false
 TAG="superlite"
+VARIANT="superlite"  # superlite | superlite-install | superlite-parted
 
 # ── Parse args ────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -28,8 +29,18 @@ while [[ $# -gt 0 ]]; do
         --docker)     USE_DOCKER=true; shift ;;
         --output)     OUTPUT="$2"; shift 2 ;;
         --tag)        TAG="$2"; shift 2 ;;
+        --variant)    VARIANT="$2"; shift 2 ;;
+        --all)        VARIANT="all"; shift ;;
         -h|--help)
-            echo "Usage: $0 [--setup-only] [--docker] [--output PATH] [--tag NAME]"
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --variant NAME   Build variant: superlite (default), superlite-install, superlite-parted"
+            echo "  --all            Build all three variants"
+            echo "  --setup-only     Just set up the build environment"
+            echo "  --docker         Build inside Docker container"
+            echo "  --output PATH    Custom output path"
+            echo "  --tag NAME       Build tag"
             exit 0
             ;;
         *) echo "Unknown: $1"; exit 1 ;;
@@ -38,146 +49,165 @@ done
 
 log() { echo "[build] $*"; }
 
-# ── Docker build ──────────────────────────────────────────────────────────────
-if [[ "$USE_DOCKER" == true ]]; then
-    log "Building inside Docker..."
+# ── Build function (reused for all variants) ──────────────────────────────────
+build_variant() {
+    local variant="$1"
+    local tag="$2"
+    local output_dir="$3"
+
+    log "Building variant: ${variant} (tag: ${tag})"
+
+    if [[ "$USE_DOCKER" == true ]]; then
+        _docker_build "$variant" "$tag" "$output_dir"
+    else
+        _native_build "$variant" "$tag" "$output_dir"
+    fi
+}
+
+_docker_build() {
+    local variant="$1"
+    local tag="$2"
+    local output_dir="$3"
+
+    log "Building ${variant} inside Docker..."
+    mkdir -p "$output_dir"
+
     docker run --rm \
         --privileged \
         -v "${SCRIPT_DIR}:/build" \
         -w /build \
         alpine:edge \
-        sh -c '
+        sh -c "
             set -e
-
-            # Install dependencies
             apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
                 busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
                 grub-efi grub-bios lua5.4 git
 
-            # Create build user
             adduser -D build
             addgroup build abuild 2>/dev/null || true
-            echo "build:build" | chpasswd
-            echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+            echo 'build:build' | chpasswd
+            echo 'build ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-            # Generate signing key
-            su build -c "abuild-keygen -a -n"
-
-            # Clone aports
+            su build -c 'abuild-keygen -a -n'
             git clone --depth=1 git://git.alpinelinux.org/aports /home/build/aports
 
-            # Copy SuperLite profile + overlay
-            cp /build/aports/scripts/mkimg.superlite.sh /home/build/aports/scripts/
-            cp /build/aports/scripts/genapkovl-superlite.sh /home/build/aports/scripts/
-            chmod +x /home/build/aports/scripts/genapkovl-superlite.sh
+            cp /build/aports/scripts/mkimg.${variant}.sh /home/build/aports/scripts/
+            cp /build/aports/scripts/genapkovl-${variant}.sh /home/build/aports/scripts/
+            chmod +x /home/build/aports/scripts/genapkovl-${variant}.sh
             ln -sf /build/dotfiles /home/build/aports/scripts/dotfiles
             ln -sf /build/alpine /home/build/aports/scripts/alpine
             chown -R build:build /home/build/aports
 
-            # Prepare output dir
-            mkdir -p /build/output
-            chown build:build /build/output
+            mkdir -p /build/output/${variant}
+            chown build:build /build/output/${variant}
 
-            # Install signing key into system so mkinitfs includes it
-            PUBKEY=$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
-            PRIVKEY=$(ls /home/build/.abuild/build-*.rsa 2>/dev/null | head -1)
-            echo "Signing with: $PRIVKEY"
-            cp "$PUBKEY" /etc/apk/keys/
-            echo "Key installed to /etc/apk/keys/"
-            su build -c "
-                PACKAGER_PRIVKEY=$PRIVKEY \
-                PACKAGER_PUBKEY=$PUBKEY \
-                cd /home/build/aports/scripts && ./mkimage.sh \
-                    --profile superlite \
-                    --arch x86_64 \
-                    --hostkeys \
-                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
-                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
-                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
-                    --outdir /build/output/ \
-                    --tag '"${TAG}"'
-            "
+            PUBKEY=\$(ls /home/build/.abuild/build-*.rsa.pub 2>/dev/null | head -1)
+            PRIVKEY=\$(ls /home/build/.abuild/build-*.rsa 2>/dev/null | head -1)
+            cp \"\$PUBKEY\" /etc/apk/keys/
 
-        '
-    log "ISO built at: ${SCRIPT_DIR}/output/"
-    exit 0
-fi
+            su build -c \"
+                PACKAGER_PRIVKEY=\$PRIVKEY \\
+                PACKAGER_PUBKEY=\$PUBKEY \\
+                cd /home/build/aports/scripts && ./mkimage.sh \\
+                    --profile ${variant} \\
+                    --arch x86_64 \\
+                    --hostkeys \\
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \\
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \\
+                    --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \\
+                    --outdir /build/output/${variant}/ \\
+                    --tag '${tag}'
+            \"
+        "
+    log "ISO built at: ${output_dir}/"
+}
 
-# ── Native build (must be on Alpine) ──────────────────────────────────────────
-if [[ ! -f /etc/alpine-release ]]; then
-    log "WARNING: Not running on Alpine. Use --docker for containerized build."
-    log "Or install Alpine build dependencies first."
-fi
+_native_build() {
+    local variant="$1"
+    local tag="$2"
+    local output_dir="$3"
 
-# ── Install dependencies ─────────────────────────────────────────────────────
-log "Installing build dependencies..."
-apk add --no-cache \
-    alpine-sdk build-base apk-tools alpine-conf \
-    busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
-    grub-efi grub-bios lua5.4 git 2>/dev/null || true
+    if [[ ! -f /etc/alpine-release ]]; then
+        log "WARNING: Not running on Alpine. Use --docker for containerized build."
+    fi
 
-# ── Generate signing key if needed ────────────────────────────────────────────
-if ! ls ~/.abuild/build-*.rsa >/dev/null 2>&1; then
-    log "Generating signing key..."
-    abuild-keygen -a -n
-fi
+    log "Installing build dependencies..."
+    apk add --no-cache \
+        alpine-sdk build-base apk-tools alpine-conf \
+        busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
+        grub-efi grub-bios lua5.4 git 2>/dev/null || true
 
-# ── Clone aports if needed ────────────────────────────────────────────────────
-if [[ ! -d /root/aports ]]; then
-    log "Cloning aports..."
-    git clone --depth=1 git://git.alpinelinux.org/aports /root/aports
-fi
+    if ! ls ~/.abuild/build-*.rsa >/dev/null 2>&1; then
+        log "Generating signing key..."
+        abuild-keygen -a -n
+    fi
 
-# ── Copy profile scripts ─────────────────────────────────────────────────────
-log "Installing SuperLite profile..."
-cp "${APORTS_DIR}/scripts/mkimg.superlite.sh"   /root/aports/scripts/
-cp "${APORTS_DIR}/scripts/genapkovl-superlite.sh" /root/aports/scripts/
-chmod +x /root/aports/scripts/genapkovl-superlite.sh
+    if [[ ! -d /root/aports ]]; then
+        log "Cloning aports..."
+        git clone --depth=1 git://git.alpinelinux.org/aports /root/aports
+    fi
 
-if [[ -d "${SCRIPT_DIR}/dotfiles" ]]; then
-    ln -sf "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles 2>/dev/null || \
-        cp -r "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles
-fi
+    log "Installing ${variant} profile..."
+    cp "${APORTS_DIR}/scripts/mkimg.${variant}.sh"   /root/aports/scripts/
+    cp "${APORTS_DIR}/scripts/genapkovl-${variant}.sh" /root/aports/scripts/
+    chmod +x /root/aports/scripts/genapkovl-${variant}.sh
 
-if [[ "$SETUP_ONLY" == true ]]; then
-    log "Setup complete. Build manually with:"
-    log "  cd /root/aports/scripts && PACKAGER_PRIVKEY=~/.abuild/build-*.rsa ./mkimage.sh --profile superlite --arch x86_64 --hostkeys --outdir ~/iso/ --tag ${TAG}"
-    exit 0
-fi
+    if [[ -d "${SCRIPT_DIR}/dotfiles" ]]; then
+        ln -sf "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles 2>/dev/null || \
+            cp -r "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles
+    fi
 
-# ── Build ISO ─────────────────────────────────────────────────────────────────
-log "Building SuperLite OS ISO..."
+    if [[ "$SETUP_ONLY" == true ]]; then
+        log "Setup complete. Build manually with:"
+        log "  cd /root/aports/scripts && PACKAGER_PRIVKEY=~/.abuild/build-*.rsa ./mkimage.sh --profile ${variant} --arch x86_64 --hostkeys --outdir ~/iso/ --tag ${tag}"
+        return 0
+    fi
+
+    log "Building ${variant} ISO..."
+    mkdir -p "$output_dir"
+
+    cd /root/aports/scripts
+    PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1)
+    PRIVKEY=$(ls ~/.abuild/build-*.rsa | head -1)
+    cp "$PUBKEY" /etc/apk/keys/
+    PACKAGER_PRIVKEY="$PRIVKEY" \
+    PACKAGER_PUBKEY="$PUBKEY" \
+    ./mkimage.sh \
+        --profile "$variant" \
+        --arch x86_64 \
+        --hostkeys \
+        --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
+        --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
+        --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
+        --outdir "$output_dir" \
+        --tag "$tag"
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 ISO_OUT="${OUTPUT:-${SCRIPT_DIR}/output}"
-mkdir -p "$ISO_OUT"
 
-cd /root/aports/scripts
-PUBKEY=$(ls ~/.abuild/build-*.rsa.pub | head -1)
-PRIVKEY=$(ls ~/.abuild/build-*.rsa | head -1)
-cp "$PUBKEY" /etc/apk/keys/
-PACKAGER_PRIVKEY="$PRIVKEY" \
-PACKAGER_PUBKEY="$PUBKEY" \
-./mkimage.sh \
-    --profile superlite \
-    --arch x86_64 \
-    --hostkeys \
-    --repository http://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --repository http://dl-cdn.alpinelinux.org/alpine/edge/community \
-    --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing \
-    --outdir "$ISO_OUT" \
-    --tag "$TAG"
-
-# ── Done ──────────────────────────────────────────────────────────────────────
-ISO_FILE=$(find "$ISO_OUT" -name "*.iso" -type f | head -1)
-if [[ -n "$ISO_FILE" ]]; then
-    ISO_SIZE=$(du -sh "$ISO_FILE" | cut -f1)
+if [[ "$VARIANT" == "all" ]]; then
+    for v in superlite superlite-install superlite-parted; do
+        build_variant "$v" "$TAG" "${ISO_OUT}/${v}"
+    done
     log "═══════════════════════════════════════════════"
-    log "ISO created: $ISO_FILE"
-    log "Size: ${ISO_SIZE}"
-    log "Boot: UEFI + Legacy BIOS"
-    log "Rufus: Compatible (ISO + DD mode)"
-    log "Ventoy: Compatible"
+    log "All ISOs built in: ${ISO_OUT}/"
     log "═══════════════════════════════════════════════"
 else
-    log "ERROR: ISO not found in ${ISO_OUT}/"
+    build_variant "$VARIANT" "$TAG" "${ISO_OUT}/${VARIANT}"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+ISO_FILES=$(find "$ISO_OUT" -name "*.iso" -type f 2>/dev/null)
+if [[ -n "$ISO_FILES" ]]; then
+    log "═══════════════════════════════════════════════"
+    while IFS= read -r iso; do
+        ISO_SIZE=$(du -sh "$iso" | cut -f1)
+        log "  $iso ($ISO_SIZE)"
+    done <<< "$ISO_FILES"
+    log "Boot: UEFI + Legacy BIOS"
+    log "═══════════════════════════════════════════════"
+else
+    log "ERROR: No ISO found in ${ISO_OUT}/"
     exit 1
 fi

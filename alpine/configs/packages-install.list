@@ -1,0 +1,122 @@
+# ============================================================================
+# SuperLite OS — Installation ISO Package List
+# Full desktop + disk partitioning tools + installer
+# ============================================================================
+
+# --- Everything from base desktop ---
+alpine-base
+openrc
+busybox
+busybox-suid
+busybox-static
+busybox-extras
+kmod
+micro
+helix
+lazygit
+shadow
+shadow-login
+sudo
+
+# --- Disk Partition Tools ---
+parted
+gdisk
+fdisk
+dosfstools
+btrfs-progs
+e2fsprogs
+e2fsprogs-extra
+ntfs-3g
+lvm2
+mdadm
+smartmontools
+hdparm
+lsblk
+util-linux
+
+# --- Kernel + Firmware ---
+linux-lts
+linux-firmware-i915
+linux-firmware-amdgpu
+linux-firmware-amd-ucode
+linux-firmware-ath10k
+linux-firmware-rtlwifi
+linux-firmware-rtw89
+linux-firmware-rtl_bt
+linux-firmware-brcm
+linux-firmware-cirrus
+linux-firmware-other
+udev
+eudev
+
+# --- Wayland Desktop ---
+labwc
+foot
+mesa-dri-gallium
+mesa-egl
+mesa-gl
+mesa-gbm
+mesa-va-gallium
+seatd
+elogind
+dbus
+dbus-x11
+xwayland
+
+# --- Desktop Components ---
+waybar
+swaybg
+swayidle
+mako
+tofi
+rofi
+gammastep
+brightnessctl
+gsettings-desktop-schemas
+
+# --- Audio ---
+pipewire
+pipewire-alsa
+pipewire-pulse
+wireplumber
+alsa-utils
+
+# --- Fonts & Cursors ---
+fontconfig
+font-awesome
+font-terminus
+font-dejavu
+font-jetbrains-mono
+font-tamzen
+simp1e-cursors
+
+# --- Desktop Tools ---
+agetty
+agetty-openrc
+libnotify
+polkit
+grim
+slurp
+wtype
+pcmanfm
+imv
+mpv
+lxappearance
+qt5ct
+
+# --- Networking ---
+networkmanager
+networkmanager-cli
+networkmanager-tui
+networkmanager-wifi
+
+# --- Boot (ISO only) ---
+grub-efi
+grub-bios
+syslinux
+squashfs-tools
+xorriso
+mkinitfs
+mtools
+dosfstools
+lua5.4
