@@ -1,4 +1,4 @@
-.PHONY: help build build-all build-install build-parted docker docker-all docker-install docker-parted setup clean validate push release
+.PHONY: help build build-legacy build-install build-parted docker docker-legacy docker-install docker-parted setup clean validate push release
 
 TAG     := latest
 DATE    := $(shell date +%Y%m%d)
@@ -11,33 +11,31 @@ help: ## Show this help
 setup: ## Set up Alpine build environment
 	./build.sh --setup-only
 
-# ── Desktop ISO (default) ────────────────────────────────────────────────────
-build: ## Build desktop ISO (requires Alpine)
+# ── Unified ISO (default) ────────────────────────────────────────────────────
+build: ## Build unified ISO — 1 ISO, boot menu (requires Alpine)
+	sudo ./build.sh --variant superlite-unified --tag $(TAG)
+
+docker: ## Build unified ISO inside Docker
+	./build.sh --docker --variant superlite-unified --tag $(TAG)
+
+# ── Legacy standalone ISOs ───────────────────────────────────────────────────
+build-legacy: ## Build desktop-only ISO
 	sudo ./build.sh --variant superlite --tag $(TAG)
 
-docker: ## Build desktop ISO inside Docker
+docker-legacy: ## Build desktop-only ISO in Docker
 	./build.sh --docker --variant superlite --tag $(TAG)
 
-# ── Installation ISO ─────────────────────────────────────────────────────────
-build-install: ## Build installation ISO (requires Alpine)
+build-install: ## Build install-only ISO
 	sudo ./build.sh --variant superlite-install --tag $(TAG)
 
-docker-install: ## Build installation ISO inside Docker
+docker-install: ## Build install-only ISO in Docker
 	./build.sh --docker --variant superlite-install --tag $(TAG)
 
-# ── Partition Manager ISO ────────────────────────────────────────────────────
-build-parted: ## Build partition manager ISO (requires Alpine)
+build-parted: ## Build partition-manager-only ISO
 	sudo ./build.sh --variant superlite-parted --tag $(TAG)
 
-docker-parted: ## Build partition manager ISO inside Docker
+docker-parted: ## Build partition-manager-only ISO in Docker
 	./build.sh --docker --variant superlite-parted --tag $(TAG)
-
-# ── All ISOs ─────────────────────────────────────────────────────────────────
-build-all: ## Build all 3 ISOs (requires Alpine)
-	sudo ./build.sh --all --tag $(TAG)
-
-docker-all: ## Build all 3 ISOs inside Docker
-	./build.sh --docker --all --tag $(TAG)
 
 # ── Utilities ────────────────────────────────────────────────────────────────
 clean: ## Remove build artifacts
@@ -49,7 +47,7 @@ validate: ## Validate project structure
 push: ## Push to GitHub
 	git add -A && git commit -m "build: $(DATE)" && git push
 
-release: ## Create GitHub release with ISOs
-	gh release create "v$(DATE)" $(ISO_DIR)/**/*.iso \
+release: ## Create GitHub release with ISO
+	gh release create "v$(DATE)" $(ISO_DIR)/*.iso \
 		--title "SuperLite OS $(DATE)" \
 		--notes "Alpine Linux + LabWC Wayland Desktop"
