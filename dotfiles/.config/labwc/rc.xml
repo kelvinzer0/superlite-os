@@ -320,7 +320,66 @@
     <keybind key="W-S-Right">
       <action name="SnapToRegion" region="bottom-right"/>
     </keybind>
-  </keyboard>
+
+    <!-- ═══ Window Management ═══ -->
+
+    <!-- Maximize / Unmaximize -->
+    <keybind key="W-m">
+      <action name="ToggleMaximize"/>
+    </keybind>
+
+    <!-- Maximize horizontally only -->
+    <keybind key="W-S-m">
+      <action name="ToggleMaximize" direction="horizontal"/>
+    </keybind>
+
+    <!-- Minimize (iconify) -->
+    <keybind key="W-n">
+      <action name="Iconify"/>
+    </keybind>
+
+    <!-- Restore all minimized windows -->
+    <keybind key="W-S-n">
+      <action name="Unmaximize"/>
+    </keybind>
+
+    <!-- Close window -->
+    <keybind key="A-F4">
+      <action name="Close"/>
+    </keybind>
+
+    <!-- Move window to center -->
+    <keybind key="W-c">
+      <action name="MoveRelative" x="50%" y="50%"/>
+    </keybind>
+
+    <!-- Always on top toggle -->
+    <keybind key="W-t">
+      <action name="ToggleAlwaysOnTop"/>
+    </keybind>
+
+    <!-- Shade (roll up titlebar) -->
+    <keybind key="W-s">
+      <action name="ToggleShade"/>
+    </keybind>
+
+    <!-- Switch windows -->
+    <keybind key="A-Tab">
+      <action name="NextWindow"/>
+    </keybind>
+    <keybind key="A-S-Tab">
+      <action name="PreviousWindow"/>
+    </keybind>
+
+    <!-- Focus next/previous window -->
+    <keybind key="W-Tab">
+      <action name="NextWindow"/>
+    </keybind>
+    <keybind key="W-S-Tab">
+      <action name="PreviousWindow"/>
+    </keybind>
+
+    </keyboard>
   <!--
     Multiple <mousebind> can exist within one <context>
     Multiple <actions> can exist within one <mousebind>
