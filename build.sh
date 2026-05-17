@@ -71,6 +71,7 @@ if [[ "$USE_DOCKER" == true ]]; then
             cp /build/aports/scripts/genapkovl-superlite.sh /home/build/aports/scripts/
             chmod +x /home/build/aports/scripts/genapkovl-superlite.sh
             ln -sf /build/dotfiles /home/build/aports/scripts/dotfiles
+            ln -sf /build/alpine /home/build/aports/scripts/alpine
             chown -R build:build /home/build/aports
 
             # Prepare output dir
