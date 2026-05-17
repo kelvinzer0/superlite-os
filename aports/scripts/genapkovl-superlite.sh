@@ -92,7 +92,6 @@ rc_add udev-trigger boot
 rc_add udev-settle boot
 rc_add udev-postmount boot
 
-rc_add agetty default
 rc_add seatd default
 rc_add elogind default
 rc_add dbus default
@@ -104,6 +103,11 @@ rc_add sshd default
 rc_add mount-ro shutdown
 rc_add killprocs shutdown
 rc_add savecache shutdown
+
+# ── agetty per-port symlinks (OpenRC requires port-specific symlinks) ────────
+mkdir -p "$tmp"/etc/runlevels/default
+ln -sf /etc/init.d/agetty "$tmp"/etc/runlevels/default/agetty.tty1
+ln -sf /etc/init.d/agetty "$tmp"/etc/runlevels/default/agetty.ttyS0
 
 # ── Auto-login wrapper (for busybox getty fallback) ─────────────────────────
 mkdir -p "$tmp"/usr/sbin
