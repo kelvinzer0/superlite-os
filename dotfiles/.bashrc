@@ -22,6 +22,5 @@
 #alias wr="setfont /usr/share/consolefonts/ter-v24b.psf.gz; micro -statusline false -ruler false note/todo.md; setfont /usr/share/consolefonts/ter-112n.psf.gz; clear"
 
 #PS1='[\u@\h \W]\$ '
-PS1='[\u@\W]\$ '
-#PS1='\[\e[1;37m\][\u@\W]\$\[\e[0m\] '
-#PS1='\[\e[0;31m\]┌──\[\e[0;32m\][\u]\[\e[0;31m\]─\e[0;33m\[[$(battery_status)]\e[0;31m\]─\[\e[0;36m\][\A]\[\e[0;31m\]─\[\e[0;34m\][\w]\[\e[m\]\n\[\e[0;31m\]└────╼ \[\e[0;31m\]\[$(tput sgr0)\]'
+#PS1='[\u@\W]\$ '
+PS1='\[\e[1;37m\][\u@\W]\$\[\e[0m\] '

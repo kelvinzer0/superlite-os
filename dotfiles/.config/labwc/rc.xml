@@ -51,11 +51,12 @@
 		<name>Misc OhSnap</name>
         <size>12</size>
       <slant>normal</slant>
-      <weight>norma</weight>
+      <weight>normal</weight>
     </font>
   </theme>
   
-  <windowSwitcher show="yes" preview="yes" outlines="yes" allWorkspaces="yes">
+  <windowSwitcher preview="yes" outlines="yes">
+    <osd show="yes" allWorkspaces="yes" />
     <fields>
       <field content="workspace" width="25%"/>
       <field content="trimmed_identifier" width="25%"/>
@@ -91,7 +92,7 @@
 
   <snapping>
     <!-- Set range to 0 to disable window snapping completely -->
-    <range>1</range>
+    <range inner="0" outer="1" />
     <overlay enabled="yes">
       <delay inner="500" outer="500" />
     </overlay>
@@ -508,19 +509,7 @@
 
   <libinput>
     <device category="default">
-    <naturalScroll></naturalScroll>
-    <leftHanded></leftHanded>
-    <pointerSpeed></pointerSpeed>
-    <accelProfile></accelProfile>
     <tap>yes</tap>
-    <tapButtonMap></tapButtonMap>
-    <tapAndDrag></tapAndDrag>
-    <dragLock></dragLock>
-    <middleEmulation></middleEmulation>
-    <disableWhileTyping></disableWhileTyping>
-    <clickMethod></clickMethod>
-    <sendEventsMode></sendEventsMode>
-    <calibrationMatrix></calibrationMatrix>
     <scrollFactor>1.0</scrollFactor>
     </device>
   </libinput>
