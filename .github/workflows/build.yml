@@ -79,7 +79,7 @@ jobs:
           # After auto-login, unified ISO shows boot menu or shell
           # Handle both: menu (choose 4=shell) or direct shell
           expect {
-            -re "Choose \\[1-4\\]:" {
+            -re {Choose [1-4]:} {
               puts "\n  Boot menu detected — selecting Shell (4)"
               send "4\r"
             }
