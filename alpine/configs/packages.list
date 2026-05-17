@@ -24,6 +24,8 @@ helix
 lazygit
 bluez
 tlp
+acpi
+upower
 shadow
 shadow-login
 sudo

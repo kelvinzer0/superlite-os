@@ -157,6 +157,11 @@
         "format-icons": ["", "", "", "", "", "", "", "", ""]
     },
     "battery": {
+        "bat": "BAT0",
+        "adapter": "ADP1",
+        "full-at": 100,
+        "design-capacity": true,
+        "interval": 30,
         "states": {
             // "good": 95,
             "warning": 15,
@@ -170,13 +175,17 @@
         // "format-good": "", // An empty format will hide the module
         //"format-full": "",
         "format-icons": ["", "", "", "", ""],
-        "tooltip-format": "{power}W - {capacity}%",
+        "tooltip-format": "{capacity}% ({timeTo})\n{power}W | {energy}Wh",
         //"format-rotate": "270",
         "rotate": 90
 
     },
     "battery#bat2": {
-        "bat": "BAT2"
+        "bat": "BAT1",
+        "adapter": "ADP1",
+        "full-at": 100,
+        "design-capacity": true,
+        "interval": 30,
     },
         "custom/gammastep": {
         "format": "{}",
