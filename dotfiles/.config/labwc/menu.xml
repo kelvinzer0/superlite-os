@@ -19,7 +19,7 @@
 			<action name="Execute"><command>pcmanfm</command></action>
 		</item>
 		<item label="E-Mail">
-			<action name="Execute"><command>sylpheed</command></action>
+			<action name="Execute"><command>thunderbird</command></action>
 		</item>
 		<item label="Browser">
 			<action name="Execute"><command>firefox</command></action>
@@ -33,10 +33,10 @@
 
 	<menu id="Vpn" label="VPN">
 	<item label="Connect">
-		<action name="Execute"><command>nmcli connection up us2950.nordvpn.com.udp</command></action>
+		<action name="Execute"><command>warp-cli connect</command></action>
 	</item>
 	<item label="Disconnect">
-		<action name="Execute"><command>nmcli connection down us2950.nordvpn.com.udp</command></action>
+		<action name="Execute"><command>warp-cli disconnect</command></action>
 	</item>
 	<item label="Network Manager Config">
 		<action name="Execute"><command>nm-connection-editor</command></action>

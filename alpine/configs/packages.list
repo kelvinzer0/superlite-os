@@ -105,6 +105,12 @@ networkmanager-cli
 networkmanager-tui
 networkmanager-wifi
 
+# --- VPN (Cloudflare WARP) ---
+cloudflare-warp
+
+# --- Email ---
+thunderbird
+
 # --- Boot (ISO only, not runtime) ---
 grub-efi
 grub-bios
