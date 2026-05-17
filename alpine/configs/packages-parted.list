@@ -20,9 +20,7 @@ less
 
 # --- Disk Partition Tools ---
 parted
-gdisk
-fdisk
-sfdisk
+gptfdisk
 cfdisk
 sgdisk
 dosfstools
