@@ -69,8 +69,9 @@ mkdir -p "$tmp"/etc/apk
 } | makefile root:root 0644 "$tmp"/etc/apk/repositories
 
 # ── Package world (for post-boot apk add) ─────────────────────────────────────
-# Read from alpine/configs/packages.list, strip comments and blank lines
-sed 's/#.*//;/^[[:space:]]*$/d' "$CONFIGS_DIR/packages.list" | makefile root:root 0644 "$tmp"/etc/apk/world
+# Read from alpine/configs/packages.list, strip comments, blank lines, and
+# exclude ISO-only boot packages (grub, syslinux, squashfs-tools, etc.)
+sed '/# --- Boot (ISO only/,$d; s/#.*//; /^[[:space:]]*$/d' "$CONFIGS_DIR/packages.list" | makefile root:root 0644 "$tmp"/etc/apk/world
 
 # ── OpenRC services ───────────────────────────────────────────────────────────
 rc_add devfs sysinit
