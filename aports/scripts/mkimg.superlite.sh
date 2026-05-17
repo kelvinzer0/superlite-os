@@ -14,10 +14,10 @@ profile_superlite() {
     # Find configs directory (works in both native and Docker builds)
     _configs_dir=""
     for dir in \
-        "$(cd "$(dirname "$0")" && pwd)/../../alpine/configs" \
         "$(cd "$(dirname "$0")" && pwd)/alpine/configs" \
         "/build/alpine/configs" \
-        "./alpine/configs"; do
+        "./alpine/configs" \
+        "$(cd "$(dirname "$0")" && pwd)/../../alpine/configs"; do
         if [ -d "$dir" ] && [ -f "$dir/repositories" ]; then
             _configs_dir="$dir"
             break

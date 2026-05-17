@@ -85,6 +85,8 @@ simp1e-cursors
 
 # --- Desktop Tools ---
 util-linux
+agetty
+agetty-openrc
 libnotify
 polkit
 grim
