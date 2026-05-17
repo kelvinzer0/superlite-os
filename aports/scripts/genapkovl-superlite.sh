@@ -298,7 +298,7 @@ if [ -z "$WAYLAND_DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
         sleep 1
     fi
     # Start LabWC with dbus session
-    exec dbus-run-session --exit-with-session labwc
+    exec dbus-run-session labwc
 fi
 EOF
 
