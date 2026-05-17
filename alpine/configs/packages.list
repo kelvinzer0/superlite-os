@@ -65,6 +65,8 @@ xwayland
 # --- Desktop Components (LabWC-Alpine-Netbook style) ---
 waybar
 swaybg
+wlr-randr
+wpaperd
 swayidle
 mako
 tofi

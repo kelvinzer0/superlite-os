@@ -31,6 +31,42 @@
  <!-- Other -->
 		<separator/>
 
+	<menu id="Display" label="Display">
+		<item label="1920×1080">
+			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1920x1080@60</command></action>
+		</item>
+		<item label="1600×900">
+			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1600x900@60</command></action>
+		</item>
+		<item label="1366×768">
+			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1366x768@60</command></action>
+		</item>
+		<item label="1280×720">
+			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1280x720@60</command></action>
+		</item>
+		<separator/>
+		<item label="Show Current">
+			<action name="Execute"><command>foot -e sh -c "wlr-randr; echo; read -p 'Press enter...'"</command></action>
+		</item>
+	</menu>
+
+	<menu id="Wallpaper" label="Wallpaper">
+		<item label="Browse...">
+			<action name="Execute"><command>pcmanfm ~/Pictures/wallpapers</command></action>
+		</item>
+		<separator/>
+		<item label="Set from File...">
+			<action name="Execute"><command>foot -e sh -c "echo 'Drag image here or type path:'; read f; pkill swaybg; swaybg -i \"\$f\" -m fill &"</command></action>
+		</item>
+		<item label="Random Wallpaper">
+			<action name="Execute"><command>sh -c 'pkill swaybg; f=$(ls ~/Pictures/wallpapers/*.{jpg,png,webp} 2>/dev/null | shuf -n1); [ -n "$f" ] && swaybg -i "$f" -m fill &'</command></action>
+		</item>
+		<separator/>
+		<item label="Stop Wallpaper">
+			<action name="Execute"><command>pkill swaybg</command></action>
+		</item>
+	</menu>
+
 	<menu id="Vpn" label="VPN">
 	<item label="Connect">
 		<action name="Execute"><command>wg-quick up wgcf-profile</command></action>
