@@ -61,6 +61,7 @@ pipewire-pulse
 wireplumber
 
 # --- Fonts & Cursors ---
+fontconfig
 font-awesome
 font-terminus
 font-dejavu

@@ -11,40 +11,16 @@ profile_superlite() {
     syslinux_serial="0 115200"
     modloop_sign=no
 
-    # Add testing repo for font-tamzen, gammastep, simp1e-cursors, qt5ct, lxappearance
-    repos="$repos
-        http://dl-cdn.alpinelinux.org/alpine/edge/testing
-    "
+    # Read repos from alpine/configs/repositories
+    local _script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local _configs_dir="$_script_dir/../../alpine/configs"
+    repos="$repos $(cat "$_configs_dir/repositories" | tr '\n' ' ')"
 
     # Exclude conflicting vlan package (breaks ifupdown-ng in edge)
-    apks="$apks !vlan
-    "
+    apks="$apks !vlan"
 
-    apks="$apks
-        alpine-base openrc busybox busybox-suid busybox-static busybox-extras kmod
-        linux-lts
-        linux-firmware-i915 linux-firmware-amdgpu linux-firmware-amd-ucode
-        linux-firmware-ath10k linux-firmware-rtlwifi linux-firmware-rtw89
-        linux-firmware-rtl_bt linux-firmware-brcm linux-firmware-cirrus linux-firmware-other
-        udev xf86-input-libinput firefox
-        agetty
-        labwc labwc-doc foot mesa-dri-gallium mesa-egl mesa-gl mesa-gbm
-        mesa-va-gallium seatd dbus dbus-x11
-        waybar swaybg swayidle mako tofi gammastep brightnessctl
-        gsettings-desktop-schemas
-        font-awesome font-terminus font-dejavu font-jetbrains-mono font-tamzen simp1e-cursors
-        networkmanager networkmanager-cli networkmanager-tui networkmanager-wifi
-        pcmanfm imv mpv
-        grim slurp wtype wf-recorder
-        pipewire pipewire-alsa pipewire-pulse wireplumber
-        libnotify lxappearance qt5ct
-        micro helix lazygit
-        bluez
-        tlp
-        shadow shadow-login
-        grub-efi grub-bios syslinux squashfs-tools xorriso mkinitfs mtools dosfstools lua5.4
-        sudo polkit
-    "
+    # Read packages from alpine/configs/packages.list
+    apks="$apks $(sed 's/#.*//;/^[[:space:]]*$/d' "$_configs_dir/packages.list" | tr '\n' ' ')"
 
     apkovl="genapkovl-superlite.sh"
 

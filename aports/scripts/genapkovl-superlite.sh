@@ -45,77 +45,18 @@ iface lo inet loopback
 EOF
 
 # ── Repositories ──────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CONFIGS_DIR="$SCRIPT_DIR/../../alpine/configs"
+
 mkdir -p "$tmp"/etc/apk
-makefile root:root 0644 "$tmp"/etc/apk/repositories <<EOF
-/media/cdrom/apks
-https://dl-cdn.alpinelinux.org/alpine/edge/main
-https://dl-cdn.alpinelinux.org/alpine/edge/community
-https://dl-cdn.alpinelinux.org/alpine/edge/testing
-EOF
+{
+    echo "/media/cdrom/apks"
+    cat "$CONFIGS_DIR/repositories"
+} | makefile root:root 0644 "$tmp"/etc/apk/repositories
 
 # ── Package world (for post-boot apk add) ─────────────────────────────────────
-makefile root:root 0644 "$tmp"/etc/apk/world <<EOF
-alpine-base
-openrc
-busybox
-busybox-suid
-busybox-static
-busybox-extras
-kmod
-linux-lts
-linux-firmware-i915
-linux-firmware-amdgpu
-linux-firmware-amd-ucode
-linux-firmware-ath10k
-linux-firmware-rtlwifi
-linux-firmware-rtw89
-linux-firmware-rtl_bt
-linux-firmware-brcm
-linux-firmware-cirrus
-linux-firmware-other
-udev
-xf86-input-libinput
-firefox
-agetty
-labwc
-foot
-mesa-dri-gallium
-mesa-egl
-mesa-gl
-mesa-gbm
-mesa-va-gallium
-seatd
-elogind
-dbus
-dbus-x11
-waybar
-swaybg
-swayidle
-mako
-tofi
-brightnessctl
-networkmanager
-font-awesome
-font-terminus
-font-dejavu
-font-jetbrains-mono
-font-tamzen
-simp1e-cursors
-gsettings-desktop-schemas
-gammastep
-pipewire
-pipewire-alsa
-pipewire-pulse
-wireplumber
-libnotify
-polkit
-sudo
-lua5.4
-xwayland
-grim
-slurp
-wtype
-EOF
+# Read from alpine/configs/packages.list, strip comments and blank lines
+sed 's/#.*//;/^[[:space:]]*$/d' "$CONFIGS_DIR/packages.list" | makefile root:root 0644 "$tmp"/etc/apk/world
 
 # ── OpenRC services ───────────────────────────────────────────────────────────
 rc_add devfs sysinit
@@ -237,16 +178,31 @@ EOF
 
 # ── Copy dotfiles to skel + root ──────────────────────────────────────────────
 # NOTE: Dotfiles are copied FIRST, then overlay files below overwrite as needed
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOTFILES_DIR="$SCRIPT_DIR/../../dotfiles"
 
 if [ -d "$DOTFILES_DIR" ]; then
     mkdir -p "$tmp"/etc/skel
-    # Copy all dotfiles
-    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/etc/skel && tar -xf -)
+    # Copy config dotfiles (.config, .bashrc, .profile, etc.)
+    for item in "$DOTFILES_DIR"/.*; do
+        name="$(basename "$item")"
+        [ "$name" = "." ] || [ "$name" = ".." ] && continue
+        [ "$name" = "usr" ] && continue
+        cp -a "$item" "$tmp"/etc/skel/
+    done
     # Also to root
     mkdir -p "$tmp"/root
-    (cd "$DOTFILES_DIR" && tar -cf - .) | (cd "$tmp"/root && tar -xf -)
+    for item in "$DOTFILES_DIR"/.*; do
+        name="$(basename "$item")"
+        [ "$name" = "." ] || [ "$name" = ".." ] && continue
+        [ "$name" = "usr" ] && continue
+        cp -a "$item" "$tmp"/root/
+    done
+
+    # Copy system files (themes, fonts, icons) to /usr/share
+    if [ -d "$DOTFILES_DIR/usr/share" ]; then
+        mkdir -p "$tmp"/usr/share
+        cp -a "$DOTFILES_DIR"/usr/share/* "$tmp"/usr/share/
+    fi
 fi
 
 # ── Shell profiles (Wayland env) ──────────────────────────────────────────────

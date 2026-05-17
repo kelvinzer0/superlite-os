@@ -4,16 +4,16 @@
 
 **Alpine Linux + LabWC Wayland** — Minimal, fast, beautiful.
 
-> Uses Alpine's native `mkimage.sh` for building. No Yocto. No bitbake. No initramfs hacking. Just works.
+> A lightweight Wayland desktop built on Alpine Linux using native `mkimage.sh`. No Yocto, no bitbake, no initramfs hacking. Just works.
 
 ## Features
 
-- 🚀 **Alpine Linux edge** — minimal, musl-based
-- 🪟 **LabWC (Wayland)** — OpenBox-style tiling for Wayland
-- 🎨 **WhiteSur-Light theme** — macOS-inspired aesthetics
-- 📦 **~300MB ISO** — full desktop in a tiny package
-- 💻 **UEFI + Legacy BIOS** — hybrid boot via GRUB/syslinux
-- 🔌 **Rufus + Ventoy** — ISO and DD mode compatible
+- **Alpine Linux edge** — minimal, musl-based system
+- **LabWC Wayland** — OpenBox-style window manager for Wayland
+- **WhiteSur-Light theme** — macOS-inspired GTK theme with Haiku icons
+- **~300MB ISO** — full desktop in a tiny package
+- **UEFI + Legacy BIOS** — hybrid boot via GRUB/syslinux
+- **Rufus + Ventoy** — ISO and DD mode compatible
 
 ## Quick Start
 
@@ -38,11 +38,14 @@ cd /root/aports/scripts
 ### Run in QEMU
 
 ```bash
-qemu-system-x86_64 \
-    -cdrom output/alpine-superlite-*.iso \
-    -m 2G \
-    -enable-kvm \
-    -boot d
+# Simple mode (serial console)
+./run-qemu-simple.sh
+
+# Full mode with options
+./run-qemu.sh --memory 2G --gui
+
+# Debug mode with tmux
+./run-qemu-debug.sh
 ```
 
 ## How It Works
@@ -52,68 +55,84 @@ build.sh
   └─ Alpine mkimage.sh
        ├─ mkimg.superlite.sh      ← profile (packages, kernel, cmdline)
        └─ genapkovl-superlite.sh   ← overlay (config, services, dotfiles)
-            └─ dotfiles/            ← LabWC, Waybar, Foot, Mako configs
+            ├─ alpine/configs/      ← packages.list, repositories
+            └─ dotfiles/            ← LabWC, Waybar, Foot, Mako, GTK themes
 ```
 
-**3 files. That's it.**
-
-| File | What it does |
-|------|-------------|
-| `aports/scripts/mkimg.superlite.sh` | Alpine profile — defines packages, kernel flavor, boot params |
-| `aports/scripts/genapkovl-superlite.sh` | Generates overlay tarball — hostname, network, services, users, dotfiles |
+| File | Purpose |
+|------|---------|
+| `aports/scripts/mkimg.superlite.sh` | Alpine profile — reads packages from `alpine/configs/packages.list` |
+| `aports/scripts/genapkovl-superlite.sh` | Generates overlay — config, services, dotfiles, themes |
 | `build.sh` | Entry point — sets up environment and calls mkimage.sh |
-
-Alpine's mkimage handles everything: kernel, initramfs, squashfs, ISO generation, hybrid boot. No custom init scripts needed.
 
 ## Project Structure
 
 ```
 superlite-os/
-├── build.sh                          # Main build script
+├── build.sh                              # Main build script
+├── Makefile                              # Build commands
 ├── aports/
 │   └── scripts/
-│       ├── mkimg.superlite.sh        # Alpine profile
-│       └── genapkovl-superlite.sh    # Overlay generator
+│       ├── mkimg.superlite.sh            # Alpine profile
+│       └── genapkovl-superlite.sh        # Overlay generator
 ├── alpine/
 │   ├── configs/
-│   │   ├── packages.list             # Package reference
-│   │   └── repositories              # APK repos
-│   ├── packages/
-│   │   └── themes/                   # WhiteSur, Haiku, OhSnap
+│   │   ├── packages.list                 # Package list
+│   │   └── repositories                  # APK repositories
 │   └── scripts/
-│       ├── install-themes.sh         # Theme installer
-│       └── compress-firmware.sh      # Firmware optimizer
-├── dotfiles/                         # User configs
-│   ├── .config/labwc/               # Window manager
-│   ├── .config/waybar/              # Status bar
-│   ├── .config/foot/                # Terminal
-│   ├── .config/mako/                # Notifications
-│   └── .config/tofi/                # App launcher
-├── iso/superlite/                    # ISO metadata
-└── .github/workflows/build.yml       # CI (Docker-based)
+│       └── compress-firmware.sh          # Firmware optimizer
+├── dotfiles/
+│   ├── .config/
+│   │   ├── labwc/                        # Window manager config
+│   │   ├── waybar/                       # Status bar
+│   │   ├── foot/                         # Terminal
+│   │   ├── mako/                         # Notifications
+│   │   ├── tofi/                         # App launcher
+│   │   ├── gtk-3.0/                      # GTK3 theme settings
+│   │   └── gtk-4.0/                      # GTK4 theme settings
+│   └── usr/share/
+│       ├── fonts/ohsnap/                 # OhSnap bitmap font
+│       ├── icons/Haiku/                  # Haiku icon theme
+│       └── themes/WhiteSur-Light/        # GTK theme
+├── tests/
+│   └── validate-build.sh                 # Build validation
+├── run-qemu.sh                           # QEMU runner (full)
+├── run-qemu-simple.sh                    # QEMU runner (simple)
+├── run-qemu-debug.sh                     # QEMU debug with tmux
+└── .github/workflows/build.yml           # CI/CD pipeline
 ```
 
 ## Customization
 
 ### Add packages
 
-Edit `aports/scripts/mkimg.superlite.sh`:
+Edit `alpine/configs/packages.list`:
 
-```bash
-apks="$apks your-package-name"
+```
+# Add your package under the appropriate section
+your-package-name
+```
+
+### Change repositories
+
+Edit `alpine/configs/repositories`:
+
+```
+https://dl-cdn.alpinelinux.org/alpine/edge/main
+https://dl-cdn.alpinelinux.org/alpine/edge/community
+https://dl-cdn.alpinelinux.org/alpine/edge/testing
 ```
 
 ### Change dotfiles
 
-Edit files in `dotfiles/` — they're copied to `/etc/skel/` and `/root/` automatically.
+Edit files in `dotfiles/` — they're copied to `/etc/skel/` and `/root/` automatically during build.
 
-### Change boot params
+### Change themes
 
-Edit `mkimg.superlite.sh`:
-
-```bash
-kernel_cmdline="unionfs_size=1G console=tty0"
-```
+Theme files are in `dotfiles/usr/share/`:
+- **GTK theme**: `themes/WhiteSur-Light/`
+- **Icons**: `icons/Haiku/`
+- **Fonts**: `fonts/ohsnap/`
 
 ## Comparison
 
