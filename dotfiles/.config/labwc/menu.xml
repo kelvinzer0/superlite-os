@@ -55,8 +55,11 @@
 			<action name="Execute"><command>pcmanfm ~/Pictures/wallpapers</command></action>
 		</item>
 		<separator/>
+		<item label="Default Wallpaper">
+			<action name="Execute"><command>sh -c "pkill swaybg; swaybg -i ~/Pictures/wallpapers/default.png -m fill &amp;"</command></action>
+		</item>
 		<item label="Random Wallpaper">
-			<action name="Execute"><command>sh -c "pkill swaybg; f=$(ls ~/Pictures/wallpapers/*.jpg ~/Pictures/wallpapers/*.png ~/Pictures/wallpapers/*.webp 2>/dev/null | shuf -n1); [ -n $f ] &amp;&amp; swaybg -i $f -m fill &amp;"</command></action>
+			<action name="Execute"><command>sh -c "pkill swaybg; f=$(ls ~/Pictures/wallpapers/*.jpg ~/Pictures/wallpapers/*.png ~/Pictures/wallpapers/*.webp 2>/dev/null | shuf -n1); [ -n \"$f\" ] &amp;&amp; swaybg -i \"$f\" -m fill &amp;"</command></action>
 		</item>
 		<separator/>
 		<item label="Stop Wallpaper">

@@ -216,6 +216,12 @@ if [ -d "$DOTFILES_DIR" ]; then
         cp -a "$item" "$tmp"/root/
     done
 
+    # Copy Pictures (wallpapers) to skel and root
+    if [ -d "$DOTFILES_DIR/Pictures" ]; then
+        cp -a "$DOTFILES_DIR/Pictures" "$tmp"/etc/skel/
+        cp -a "$DOTFILES_DIR/Pictures" "$tmp"/root/
+    fi
+
     # Copy system files (themes, fonts, icons) to /usr/share
     if [ -d "$DOTFILES_DIR/usr/share" ]; then
         mkdir -p "$tmp"/usr/share

@@ -1,8 +1,15 @@
 # LabWC autostart file
 # SuperLite OS — autostart services on session launch
 
-# Wallpaper (set via right-click menu → Wallpaper)
-# swaybg is started on-demand from menu, not at boot
+# Wallpaper — start swaybg with default or random from ~/Pictures/wallpapers
+DEFAULT_WP="$HOME/Pictures/wallpapers/default.png"
+if [ -d "$HOME/Pictures/wallpapers" ] && ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} >/dev/null 2>&1; then
+    # Random wallpaper from collection
+    WP=$(ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} 2>/dev/null | shuf -n1)
+    swaybg -i "$WP" -m fill >/dev/null 2>&1 &
+elif [ -f "$DEFAULT_WP" ]; then
+    swaybg -i "$DEFAULT_WP" -m fill >/dev/null 2>&1 &
+fi
 
 waybar >/dev/null 2>&1 &
 mako >/dev/null 2>&1 &

@@ -202,6 +202,12 @@ if [ -d "$DOTFILES_DIR" ]; then
         mkdir -p "$tmp"/usr/share
         cp -a "$DOTFILES_DIR"/usr/share/* "$tmp"/usr/share/
     fi
+
+    # Copy Pictures (wallpapers) to skel and root
+    if [ -d "$DOTFILES_DIR/Pictures" ]; then
+        cp -a "$DOTFILES_DIR/Pictures" "$tmp"/etc/skel/
+        cp -a "$DOTFILES_DIR/Pictures" "$tmp"/root/
+    fi
 fi
 
 # ── Shell profiles ────────────────────────────────────────────────────────────
