@@ -16,7 +16,11 @@ if test -z "${XDG_RUNTIME_DIR}"; then
 fi
 
 #ENV=$HOME/.bashrc; export ENV
-source /etc/bash/bash_completion.sh
+# bash completion (portable - try common paths)
+for _bc in /usr/share/bash-completion/bash_completion /etc/bash/bash_completion.sh /etc/bash_completion; do
+  [ -f "$_bc" ] && source "$_bc" && break
+done
+unset _bc
 
 alias ls='ls --color=auto'
 alias ll='ls -lav --ignore=..'   # show long listing of all except ".."
