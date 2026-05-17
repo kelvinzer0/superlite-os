@@ -27,6 +27,9 @@ tlp
 shadow
 shadow-login
 sudo
+btrfs-progs
+e2fsprogs-extra
+dosfstools
 
 # --- Kernel + Targeted Firmware ---
 linux-lts
@@ -41,6 +44,7 @@ linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
 udev
+eudev
 xf86-input-libinput
 
 # --- Wayland Desktop ---
@@ -64,6 +68,7 @@ swaybg
 swayidle
 mako
 tofi
+rofi
 gammastep
 brightnessctl
 gsettings-desktop-schemas
@@ -73,6 +78,7 @@ pipewire
 pipewire-alsa
 pipewire-pulse
 wireplumber
+alsa-utils
 
 # --- Fonts & Cursors ---
 fontconfig
