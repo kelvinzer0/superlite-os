@@ -11,7 +11,7 @@ if [[ $1 = "toggle" ]]; then
 fi
 
 if pgrep -x "gammastep" > /dev/null; then
-	echo ""
+	echo '{"text":"ON","class":"active","tooltip":"Night Light ON (5600K)"}'
 else
-	echo ""
+	echo '{"text":"OFF","class":"inactive","tooltip":"Night Light OFF"}'
 fi

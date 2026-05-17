@@ -188,10 +188,10 @@
         "interval": 30,
     },
         "custom/gammastep": {
-        "format": "{}",
-        "tooltip": false,
+        "format": " {}",
+        "return-type": "json",
+        "tooltip": true,
         "interval": 10,
-        "on-update": "",
         "exec": "sleep 0.05; $HOME/.config/scripts/gammastep.sh",
         "on-click": "bash $HOME/.config/scripts/gammastep.sh toggle"
     },
