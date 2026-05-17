@@ -29,26 +29,26 @@
 
     
     <font place="ActiveWindow">
-      <name>Misc OhSnap</name>
+      <name>JetBrains Mono</name>
       <size>8</size>
       <slant>normal</slant>
       <weight>bold</weight>
     </font>
     <font place="InActiveWindow">
-      <name>Misc OhSnap</name>
+      <name>JetBrains Mono</name>
       <size>8</size>
       <slant>normal</slant>
       <weight>bold</weight>
     </font>
 
     <font place="MenuItem">
-	   <name>Misc OhSnap</name>
+	   <name>JetBrains Mono</name>
        <size>8</size>
        <slant>normal</slant>
       <weight>bold</weight>
     </font>
     <font place="OnScreenDisplay">
-		<name>Misc OhSnap</name>
+		<name>JetBrains Mono</name>
         <size>12</size>
       <slant>normal</slant>
       <weight>normal</weight>
