@@ -53,7 +53,7 @@ jobs:
 
           # Start QEMU
           spawn qemu-system-x86_64 \
-            -m 3072 \
+            -m 4096 \
             -nographic \
             -no-reboot \
             -cdrom $env(ISO_PATH) \
