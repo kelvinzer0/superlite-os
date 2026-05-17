@@ -114,20 +114,20 @@ makefile root:root 0644 "$tmp"/etc/conf.d/agetty.ttyS0 <<EOF
 GETTY_ARGS="--autologin root --noclear 115200 ttyS0"
 EOF
 
-# ── Override /etc/inittab — disable busybox getty, use agetty service only ────
+# ── Override /etc/inittab — disable busybox getty, use agetty (util-linux) ────
 makefile root:root 0644 "$tmp"/etc/inittab <<'EOF'
 ::sysinit:/sbin/openrc sysinit
 ::sysinit:/sbin/openrc boot
 ::wait:/sbin/openrc default
 
-tty1::respawn:/sbin/agetty --autologin root --noclear 38400 tty1 linux
-tty2::respawn:/sbin/agetty 38400 tty2 linux
-tty3::respawn:/sbin/agetty 38400 tty3 linux
-tty4::respawn:/sbin/agetty 38400 tty4 linux
-tty5::respawn:/sbin/agetty 38400 tty5 linux
-tty6::respawn:/sbin/agetty 38400 tty6 linux
+tty1::respawn:/usr/bin/agetty --autologin root --noclear 38400 tty1 linux
+tty2::respawn:/usr/bin/agetty 38400 tty2 linux
+tty3::respawn:/usr/bin/agetty 38400 tty3 linux
+tty4::respawn:/usr/bin/agetty 38400 tty4 linux
+tty5::respawn:/usr/bin/agetty 38400 tty5 linux
+tty6::respawn:/usr/bin/agetty 38400 tty6 linux
 
-ttyS0::respawn:/sbin/agetty --autologin root 115200 ttyS0 vt100
+ttyS0::respawn:/usr/bin/agetty --autologin root 115200 ttyS0 vt100
 
 ::ctrlaltdel:/sbin/reboot
 ::shutdown:/sbin/openrc shutdown
