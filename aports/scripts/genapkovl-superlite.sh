@@ -323,21 +323,29 @@ done
 exec /sbin/openrc sysinit
 INITEOF
 
-# ── MOTD ──────────────────────────────────────────────────────────────────────
+# ── MOTD (dynamic, generated at login) ───────────────────────────────────────
+# Static placeholder — real MOTD is printed by /etc/profile.d/motd.sh
 makefile root:root 0644 "$tmp"/etc/motd <<'EOF'
-
-        ╲╲╲╲
-       ╲╲╲╲╲╲
-      ╲╲    ╲╲
-     ╲╲      ╲╲          superlite
-    ╲╲        ╲╲         ─────────────────────
-   ╲╲    ╱╲    ╲╲        Alpine · LabWC · Wayland
-  ╲╲    ╱  ╲    ╲╲
- ╲╲    ╱    ╲    ╲╲      lightweight. yours.
-╱╱╱   ╱      ╲   ╲╲╲
-      ╱        ╲
-
 EOF
+
+mkdir -p "$tmp"/etc/profile.d
+makefile root:root 0755 "$tmp"/etc/profile.d/motd.sh <<'MOTDEOF'
+#!/bin/sh
+# Dynamic MOTD — SuperLite OS
+# Only on interactive tty sessions
+case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0;; esac
+
+KERNEL="$(uname -r)"
+LAST_LOGIN="$(last -1 -F "$USER" 2>/dev/null | head -1 | awk '{print $4, $5, $6, $7, $8}')"
+[ -z "$LAST_LOGIN" ] && LAST_LOGIN="$(date '+%Y-%m-%d %H:%M')"
+LINE="$(printf '%0.0s─' $(seq 1 67))"
+
+printf '\n'
+printf '  Linux %-44s Last login: %s\n' "$KERNEL" "$LAST_LOGIN"
+printf '  %s\n' "$LINE"
+printf '  \042Stay curious. Break things responsibly.\042\n'
+printf '  %s\n\n' "$LINE"
+MOTDEOF
 
 # ── NetworkManager config ─────────────────────────────────────────────────────
 mkdir -p "$tmp"/etc/NetworkManager
