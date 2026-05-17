@@ -1,0 +1,299 @@
+/* ═══════════════════════════════════════════════════════
+   SuperLite OS — GTK3 CSS for PCManFM & GTK apps
+   Clean, modern, consistent with waybar glass theme
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Global ── */
+* {
+    -gtk-icon-style: symbolic;
+    outline-style: none;
+}
+
+/* ── Window ── */
+window.background,
+.background {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+
+/* ── Header bar ── */
+headerbar,
+.titlebar {
+    background: linear-gradient(180deg, #181825 0%, #1e1e2e 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 4px 8px;
+    min-height: 36px;
+}
+
+headerbar .title,
+.titlebar .title {
+    color: #cdd6f4;
+    font-weight: 600;
+}
+
+headerbar button,
+.titlebar button {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #94a3b8;
+    min-height: 24px;
+    min-width: 24px;
+    transition: all 150ms ease;
+}
+
+headerbar button:hover,
+.titlebar button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+}
+
+headerbar button:active,
+.titlebar button:active {
+    background: rgba(139, 92, 246, 0.2);
+}
+
+/* ── Sidebar / Places ── */
+.sidebar,
+placessidebar {
+    background-color: #181825;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 4px;
+}
+
+.sidebar row,
+placessidebar row {
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 1px 0;
+    min-height: 28px;
+    transition: background 150ms ease;
+}
+
+.sidebar row:hover,
+placessidebar row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar row:selected,
+placessidebar row:selected {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+}
+
+.sidebar label,
+placessidebar label {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.sidebar row:selected label,
+placessidebar row:selected label {
+    color: #c4b5fd;
+}
+
+/* ── File list / Icon view ── */
+.view,
+.icon-view,
+listview,
+treeview {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+
+.view:hover,
+.icon-view:hover,
+listview:hover,
+treeview:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.view:selected,
+.icon-view:selected,
+listview:selected,
+treeview:selected {
+    background: rgba(139, 92, 246, 0.25);
+    color: #e2e8f0;
+    border-radius: 4px;
+}
+
+/* ── File manager specific ── */
+#FmIconView {
+    background-color: #1e1e2e;
+}
+
+#FmIconView .icon-item {
+    border-radius: 8px;
+    padding: 8px;
+    transition: background 150ms ease;
+}
+
+#FmIconView .icon-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+#FmIconView .icon-item:selected {
+    background: rgba(139, 92, 246, 0.2);
+}
+
+/* ── Path bar ── */
+pathbar button {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    padding: 2px 8px;
+    color: #94a3b8;
+}
+
+pathbar button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+}
+
+pathbar button:checked {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+}
+
+/* ── Scrollbar ── */
+scrollbar {
+    background: transparent;
+}
+
+scrollbar slider {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    min-width: 6px;
+    min-height: 6px;
+    transition: all 200ms ease;
+}
+
+scrollbar slider:hover {
+    background: rgba(255, 255, 255, 0.2);
+    min-width: 8px;
+}
+
+/* ── Entry / Input ── */
+entry,
+textview {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #cdd6f4;
+    caret-color: #cdd6f4;
+    transition: border-color 150ms ease;
+}
+
+entry:focus,
+textview:focus {
+    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Button ── */
+button {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 16px;
+    color: #cdd6f4;
+    transition: all 150ms ease;
+}
+
+button:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+
+button:active {
+    background: rgba(139, 92, 246, 0.2);
+}
+
+button.suggested-action {
+    background: rgba(139, 92, 246, 0.3);
+    border-color: rgba(139, 92, 246, 0.4);
+    color: #c4b5fd;
+}
+
+button.suggested-action:hover {
+    background: rgba(139, 92, 246, 0.4);
+}
+
+button.destructive-action {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+/* ── Menu / Popover ── */
+menu,
+popover.menu {
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+menuitem,
+popover.menu menuitem {
+    border-radius: 4px;
+    padding: 6px 12px;
+    min-height: 28px;
+    transition: background 100ms ease;
+}
+
+menuitem:hover,
+popover.menu menuitem:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Notebook / Tabs ── */
+notebook header {
+    background: #181825;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+notebook tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 6px 12px;
+    color: #64748b;
+    transition: all 150ms ease;
+}
+
+notebook tab:hover {
+    color: #94a3b8;
+}
+
+notebook tab:checked {
+    color: #c4b5fd;
+    border-bottom-color: #8B5CF6;
+}
+
+/* ── Tooltip ── */
+tooltip {
+    background: rgba(24, 24, 32, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: #e0e0e0;
+}
+
+/* ── Statusbar ── */
+statusbar {
+    background: #181825;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: #64748b;
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* ── Selection rubberband ── */
+rubberband,
+.rubberband {
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.15);
+}
