@@ -45,7 +45,6 @@ linux-firmware-rtl_bt
 linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
-udev
 eudev
 xf86-input-libinput
 
