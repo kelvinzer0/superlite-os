@@ -41,7 +41,7 @@ linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
 udev
-xf86-input-libinput firefox
+xf86-input-libinput
 
 # --- Wayland Desktop ---
 labwc
