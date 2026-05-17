@@ -1,8 +1,9 @@
 # LabWC autostart file
 # SuperLite OS — autostart services on session launch
 
-#swaybg -i pics/pattern.png -m tile -c f898d0 >/dev/null 2>&1 &
-swaybg -i pics/wool-linux.png -m center >/dev/null 2>&1 &
+# Wallpaper (set via right-click menu → Wallpaper)
+# swaybg is started on-demand from menu, not at boot
+
 waybar >/dev/null 2>&1 &
 mako >/dev/null 2>&1 &
 gammastep -O 5600 2>&1 &
@@ -13,6 +14,6 @@ brightnessctl set 80% 2>&1 &
 #udiskie 2>&1 &
 
 gsettings set org.gnome.desktop.interface gtk-theme 'WhiteSur-Light' 2>&1 &
-gsettings set org.gnome.desktop.interface font-name 'Misc OhSnap 8' 2>&1 &
-gsettings set org.gnome.desktop.interface icon-theme 'Haiku' 2>&1 &
+gsettings set org.gnome.desktop.interface font-name 'JetBrains Mono 10' 2>&1 &
+gsettings set org.gnome.desktop.interface icon-theme 'SuperLite' 2>&1 &
 gsettings set org.gnome.desktop.interface cursor-theme 'simp1e-cursors' 2>&1 &
