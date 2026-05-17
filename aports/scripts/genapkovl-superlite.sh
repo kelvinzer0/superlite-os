@@ -73,6 +73,9 @@ linux-firmware-rtl_bt
 linux-firmware-brcm
 linux-firmware-cirrus
 linux-firmware-other
+udev
+xf86-input-libinput
+firefox
 agetty
 labwc
 foot
@@ -130,6 +133,9 @@ rc_add syslog boot
 rc_add networking boot
 rc_add urandom boot
 rc_add keymaps boot
+rc_add udev-trigger boot
+rc_add udev-settle boot
+rc_add udev-postmount boot
 
 rc_add seatd default
 rc_add elogind default
