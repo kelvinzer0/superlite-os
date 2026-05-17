@@ -185,6 +185,8 @@ seat:x:480:root
 seatd:x:481:root
 messagebus:x:482:
 polkitd:x:483:
+netdev:x:1000:
+tape:x:1001:
 EOF
 
 # ── Copy dotfiles to skel + root ──────────────────────────────────────────────
