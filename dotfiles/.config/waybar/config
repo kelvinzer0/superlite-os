@@ -7,7 +7,7 @@
 
     "modules-left": ["wlr/taskbar"],
     "modules-center": [],
-    "modules-right": ["custom/search", "clock", "network", "battery"],
+    "modules-right": ["custom/search", "clock", "network", "custom/battery"],
 
     "wlr/taskbar": {
         "format": "{icon}",
@@ -48,24 +48,11 @@
         "on-click": "sudo nmcli networking connectivity | grep -q none && sudo nmcli networking on && notify-send 'Wi-Fi On' || sudo nmcli networking off"
     },
 
-    "battery": {
-        "bat": "BAT0",
-        "adapter": "ADP1",
-        "full-at": 100,
+    "custom/battery": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "$HOME/.config/scripts/battery-status.sh",
         "interval": 30,
-        "states": {
-            "warning": 15,
-            "critical": 5
-        },
-        "format": "{capacity}%",
-        "format-charging": "+{capacity}%",
-        "format-plugged": "+{capacity}%",
-        "tooltip-format": "{capacity}% ({timeTo})"
-    },
-    "battery#bat2": {
-        "bat": "BAT1",
-        "adapter": "ADP1",
-        "full-at": 100,
-        "interval": 30
+        "tooltip": true
     }
 }
