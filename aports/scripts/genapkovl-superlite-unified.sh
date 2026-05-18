@@ -233,7 +233,7 @@ if [ -f /tmp/.bootmode ]; then
             ;;
         install)
             sleep 1
-            foot -T "SuperLite Installer" -e /usr/local/bin/superlite-installer &
+            /usr/local/bin/superlite-gui-installer &
             ;;
         parted)
             sleep 1
@@ -348,13 +348,14 @@ makefile root:root 0644 "$tmp"/etc/tofi/config_bootmenu <<'TOFI_EOF'
 width = 100%
 height = 100%
 padding-left = 14%
-padding-top = 38%
+padding-top = 36%
 horizontal = false
-result-spacing = 20
+result-spacing = 24
 num-results = 4
-prompt-text = "  SuperLite OS\n  Alpine · LabWC · Wayland\n\n  Choose mode:"
+prompt-text = ""
+num-results = 4
 min-input-width = 0
-font-size = 18
+font-size = 20
 font = JetBrains Mono Medium
 outline-width = 0
 border-width = 0
@@ -362,6 +363,7 @@ background-color = #1a1a2e
 text-color = #e0e0e0
 selection-color = #22AA99
 selection-background = #16213e
+result-padding = 8
 hint-font = false
 text-cursor = false
 hide-cursor = true
@@ -377,19 +379,19 @@ makefile root:root 0755 "$tmp"/usr/local/bin/superlite-gui-menu <<'MENU_EOF'
 # SuperLite OS — GUI Boot Menu (tofi)
 # Shown when no superlite.mode= kernel parameter is set
 
-choice=$(printf "Desktop\nInstall\nPartition Manager\nShell" | tofi -c /etc/tofi/config_bootmenu)
+choice=$(printf "SuperLite OS  >  Desktop\nSuperLite OS  >  Install\nSuperLite OS  >  Partition Manager\nSuperLite OS  >  Shell" | tofi -c /etc/tofi/config_bootmenu)
 
 case "$choice" in
-    Desktop)
+    *Desktop*)
         # Desktop is already running (autostart), do nothing
         ;;
-    Install)
-        foot -T "SuperLite Installer" -e /usr/local/bin/superlite-installer
+    *Install*)
+        /usr/local/bin/superlite-gui-installer
         ;;
-    "Partition Manager")
+    *"Partition Manager"*)
         foot -T "Partition Manager" -e /usr/local/bin/partman
         ;;
-    Shell)
+    *Shell*)
         foot -T "Shell"
         ;;
 esac
@@ -418,128 +420,156 @@ printf '  "Stay curious. Break things responsibly."\n'
 printf '  %s\n' "$LINE"
 
 case "$MODE" in
-    install) printf '  Mode: \033[1minstall\033[0m — Run \033[1msuperlite-installer\033[0m\n\n' ;;
+    install) printf '  Mode: \033[1minstall\033[0m — Run \033[1msuperlite-gui-installer\033[0m\n\n' ;;
     parted)  printf '  Mode: \033[1mparted\033[0m  — Run \033[1mpartman\033[0m\n\n' ;;
     *)       printf '  Mode: \033[1mdesktop\033[0m\n\n' ;;
 esac
 MOTDEOF
 
-# ── TUI Installer ────────────────────────────────────────────────────────────
+# ── GUI Installer (yad) ──────────────────────────────────────────────────────
 mkdir -p "$tmp"/usr/local/bin
-makefile root:root 0755 "$tmp"/usr/local/bin/superlite-installer <<'INSTALLER_EOF'
+makefile root:root 0755 "$tmp"/usr/local/bin/superlite-gui-installer <<'INSTALLER_EOF'
 #!/bin/sh
 # ============================================================================
-# SuperLite OS — TUI Installer
+# SuperLite OS — GUI Installer (yad)
+# Simple wizard: select disk → confirm → auto install → done
 # ============================================================================
 set -e
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
+TITLE="SuperLite OS Installer"
+WIDTH=480
 
-header() { printf "\n${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n${CYAN}${BOLD}  %s${NC}\n${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n\n" "$1"; }
-ok()   { printf "  ${GREEN}✓${NC} %s\n" "$1"; }
-fail() { printf "  ${RED}✗${NC} %s\n" "$1"; }
-warn() { printf "  ${YELLOW}!${NC} %s\n" "$1"; }
-info() { printf "  ${CYAN}→${NC} %s\n" "$1"; }
-pause() { printf "\n  Press Enter to continue..."; read -r _; }
-confirm() { printf "  ${BOLD}%s${NC} [y/N] " "$1"; read -r ans; case "$ans" in y|Y|yes|YES) return 0;; *) return 1;; esac; }
+# ── Step 1: Welcome ──────────────────────────────────────────────────────────
+yad --title="$TITLE" \
+    --text="<b><big>Welcome to SuperLite OS</big></b>\n\nThis wizard will install SuperLite OS to your computer.\n\n<b>Warning:</b> All data on the selected disk will be erased!\n\n<tt>Alpine Linux + LabWC Wayland</tt>" \
+    --image="drive-harddisk" \
+    --button="Next!go-next:0" --button="Cancel!cancel:1" \
+    --width=$WIDTH --center 2>/dev/null
+[ $? -ne 0 ] && exit 0
 
-show_disks() {
-    header "Available Disks"
-    lsblk -dno NAME,SIZE,MODEL,TYPE | grep -v loop | while read -r line; do printf "  %s\n" "$line"; done
-    echo ""
-}
+# ── Step 2: Select disk ──────────────────────────────────────────────────────
+# Build disk list for yad --list
+DISK_LIST=""
+while IFS= read -r line; do
+    name=$(echo "$line" | awk '{print $1}')
+    size=$(echo "$line" | awk '{print $2}')
+    model=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ *$//')
+    [ -z "$model" ] && model="(unknown)"
+    DISK_LIST="$DISK_LIST FALSE /dev/$name $size $model"
+done <<EOF
+$(lsblk -dno NAME,SIZE,MODEL 2>/dev/null | grep -v "loop\|rom\|sr")
+EOF
 
-partition_disk() {
-    show_disks
-    printf "  ${BOLD}Enter disk (e.g., sda, vda, nvme0n1):${NC} "
-    read -r disk; dev="/dev/$disk"
-    [ ! -b "$dev" ] && { fail "Device $dev not found"; return 1; }
+if [ -z "$DISK_LIST" ]; then
+    yad --title="$TITLE" --error --text="No disks found!" --width=$WIDTH --center 2>/dev/null
+    exit 1
+fi
 
-    header "Partition $dev"
-    printf "  ${YELLOW}WARNING: This will erase all data on $dev!${NC}\n\n"
-    printf "  1) GPT (recommended)\n  2) MBR (legacy)\n  3) Custom (cfdisk)\n  4) Auto (EFI + swap + root)\n\n  Choose [1-4]: "
-    read -r scheme
-    case "$scheme" in
-        1) parted -s "$dev" mklabel gpt; ok "GPT created"; cfdisk "$dev" ;;
-        2) parted -s "$dev" mklabel msdos; ok "MBR created"; cfdisk "$dev" ;;
-        3) cfdisk "$dev" ;;
-        4) auto_partition "$dev" ;;
-        *) fail "Invalid"; return 1 ;;
-    esac
-    ok "Partitioning complete"; lsblk "$dev"
-}
+SELECTED=$(yad --title="$TITLE" \
+    --text="<b>Select the target disk:</b>" \
+    --list --radiolist --column="" --column="Device" --column="Size" --column="Model" \
+    --print-column=2 --separator="" \
+    --button="Next!go-next:0" --button="Cancel!cancel:1" \
+    --width=$WIDTH --height=300 --center 2>/dev/null \
+    $DISK_LIST)
 
-auto_partition() {
-    dev="$1"
-    info "Auto-partitioning $dev (GPT: EFI + swap + root)"
-    size_mb=$(blockdev --getsize64 "$dev" | awk '{printf "%.0f", $1/1024/1024}')
-    wipefs -a "$dev" 2>/dev/null || true
-    parted -s "$dev" mklabel gpt
-    parted -s "$dev" mkpart ESP fat32 1MiB 513MiB
-    parted -s "$dev" set 1 esp on
+[ $? -ne 0 ] && exit 0
+DISK=$(echo "$SELECTED" | sed 's/^ *//;s/ *$//')
+
+if [ -z "$DISK" ] || [ ! -b "$DISK" ]; then
+    yad --title="$TITLE" --error --text="No disk selected!" --width=$WIDTH --center 2>/dev/null
+    exit 1
+fi
+
+# ── Step 3: Confirm ──────────────────────────────────────────────────────────
+DISK_SIZE=$(lsblk -dno SIZE "$DISK" 2>/dev/null | tr -d ' ')
+DISK_MODEL=$(lsblk -dno MODEL "$DISK" 2>/dev/null | sed 's/^ *//;s/ *$//')
+
+yad --title="$TITLE" \
+    --text="<b><big>Confirm Installation</big></b>\n\n<b>Target:</b> $DISK ($DISK_SIZE)\n<b>Model:</b> $DISK_MODEL\n\n<b><span color='red'>ALL DATA ON THIS DISK WILL BE ERASED!</span></b>\n\nThe disk will be partitioned automatically:\n- EFI System Partition (512 MB)\n- Swap (${DISK_SIZE} / 10, max 2 GB)\n- Root filesystem (ext4, remaining space)" \
+    --image="dialog-warning" \
+    --question --button="Install!apply:0" --button="Cancel!cancel:1" \
+    --width=$WIDTH --center 2>/dev/null
+[ $? -ne 0 ] && exit 0
+
+# ── Step 4: Install ──────────────────────────────────────────────────────────
+INSTALL_LOG="/tmp/superlite-install.log"
+
+{
+    # Phase 1: Partition (0-25%)
+    echo "5" ; echo "# Partitioning $DISK..."
+    wipefs -a "$DISK" 2>/dev/null || true
+    parted -s "$DISK" mklabel gpt
+    parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+    parted -s "$DISK" set 1 esp on
+    size_mb=$(blockdev --getsize64 "$DISK" | awk '{printf "%.0f", $1/1024/1024}')
     swap_mb=$((size_mb / 10)); [ "$swap_mb" -gt 2048 ] && swap_mb=2048
     swap_end=$((513 + swap_mb))
-    parted -s "$dev" mkpart primary linux-swap 513MiB "${swap_end}MiB"
-    parted -s "$dev" mkpart primary ext4 "${swap_end}MiB" 100%
-    case "$dev" in *nvme*) sep="p";; *) sep="";; esac
-    info "Formatting..."; sleep 1
-    mkfs.fat -F32 "${dev}${sep}1"
-    mkswap "${dev}${sep}2"
-    mkfs.ext4 -F "${dev}${sep}3"
-    ok "EFI: ${dev}${sep}1 (512MB) | Swap: ${dev}${sep}2 (${swap_mb}MB) | Root: ${dev}${sep}3"
-}
+    parted -s "$DISK" mkpart primary linux-swap 513MiB "${swap_end}MiB"
+    parted -s "$DISK" mkpart primary ext4 "${swap_end}MiB" 100%
+    case "$DISK" in *nvme*) sep="p";; *) sep="";; esac
 
-format_partitions() {
-    header "Format Partition"
-    show_disks
-    printf "  ${BOLD}Partition (e.g., sda1):${NC} "
-    read -r part; dev="/dev/$part"
-    [ ! -b "$dev" ] && { fail "Not found"; return 1; }
-    printf "  1)ext4 2)ext3 3)ext2 4)FAT32 5)NTFS 6)Btrfs 7)XFS 8)F2FS 9)Swap\n  Choose [1-9]: "
-    read -r fs
-    case "$fs" in
-        1) mkfs.ext4 -F "$dev";; 2) mkfs.ext3 -F "$dev";; 3) mkfs.ext2 -F "$dev";;
-        4) mkfs.fat -F32 "$dev";; 5) mkfs.ntfs -f "$dev";; 6) mkfs.btrfs -f "$dev";;
-        7) mkfs.xfs -f "$dev";; 8) mkfs.f2fs -f "$dev";; 9) mkswap "$dev";;
-        *) fail "Invalid"; return 1 ;;
-    esac
-    ok "Formatted $dev"
-}
+    # Phase 2: Format (25-40%)
+    echo "25" ; echo "# Formatting partitions..."
+    mkfs.fat -F32 "${DISK}${sep}1" >> "$INSTALL_LOG" 2>&1
+    mkswap "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
+    mkfs.ext4 -F "${DISK}${sep}3" >> "$INSTALL_LOG" 2>&1
 
-mount_partitions() {
-    header "Mount Partitions"
-    show_disks
-    printf "  ${BOLD}Root partition (e.g., sda3):${NC} "
-    read -r rp; mount "/dev/$rp" /mnt; ok "Root → /mnt"
-    printf "  ${BOLD}EFI partition (empty to skip):${NC} "
-    read -r ep; [ -n "$ep" ] && { mkdir -p /mnt/boot/efi; mount "/dev/$ep" /mnt/boot/efi; ok "EFI → /mnt/boot/efi"; }
-    printf "  ${BOLD}Swap partition (empty to skip):${NC} "
-    read -r sp; [ -n "$sp" ] && { swapon "/dev/$sp"; ok "Swap enabled"; }
-}
+    # Phase 3: Mount (40-50%)
+    echo "40" ; echo "# Mounting partitions..."
+    mount "${DISK}${sep}3" /mnt
+    mkdir -p /mnt/boot/efi
+    mount "${DISK}${sep}1" /mnt/boot/efi
+    swapon "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
 
-install_system() {
-    header "Install SuperLite OS"
-    mountpoint -q /mnt || { fail "Mount partitions first (option 3)"; return 1; }
-    info "Installing Alpine base..."; setup-disk /mnt
+    # Phase 4: Install system (50-85%)
+    echo "50" ; echo "# Installing base system (this may take a few minutes)..."
+    setup-disk -m sys /mnt >> "$INSTALL_LOG" 2>&1
+
+    # Phase 5: Copy desktop config (85-95%)
+    echo "85" ; echo "# Installing desktop environment..."
     [ -d /etc/skel ] && cp -a /etc/skel/.* /mnt/root/ 2>/dev/null || true
     cp /etc/motd /mnt/etc/motd 2>/dev/null || true
-    ok "System installed to /mnt"
-    info "Run 'reboot' to boot into installed system"
-}
+    # Copy overlay configs
+    for d in labwc foot waybar mako tofi; do
+        [ -d "/root/.config/$d" ] && cp -a "/root/.config/$d" /mnt/root/.config/ 2>/dev/null || true
+    done
 
-while true; do
-    clear
-    printf "${BOLD}${CYAN}  ╔══════════════════════════════════════════╗\n  ║       SuperLite OS Installer             ║\n  ╚══════════════════════════════════════════╝${NC}\n\n"
-    printf "  ${BOLD}Disk:${NC}  1) List  2) Partition  3) Format  4) Mount\n"
-    printf "  ${BOLD}System:${NC} 5) Install  6) cfdisk  7) Shell\n"
-    printf "  ${BOLD}Boot:${NC}  0) Reboot\n\n  Choose: "
-    read -r c
-    case "$c" in
-        1) show_disks; pause ;; 2) partition_disk; pause ;; 3) format_partitions; pause ;;
-        4) mount_partitions; pause ;; 5) install_system; pause ;; 6) cfdisk ;;
-        7) /bin/sh ;; 0) reboot ;; *) warn "Invalid"; sleep 1 ;;
-    esac
-done
+    # Phase 6: Bootloader (95-100%)
+    echo "95" ; echo "# Installing bootloader..."
+    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> "$INSTALL_LOG" 2>&1 || \
+    chroot /mnt grub-install --target=i386-pc "$DISK" >> "$INSTALL_LOG" 2>&1 || true
+    chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$INSTALL_LOG" 2>&1 || true
+
+    echo "100" ; echo "# Installation complete!"
+} | yad --progress \
+    --title="$TITLE" \
+    --text="<b>Installing SuperLite OS to $DISK</b>\n\nPlease wait..." \
+    --percentage=0 --auto-close --auto-kill \
+    --button="Cancel!cancel:1" \
+    --width=$WIDTH --center 2>/dev/null
+
+INSTALL_RESULT=$?
+
+if [ $INSTALL_RESULT -ne 0 ]; then
+    # Show error with log
+    LOG_TAIL=$(tail -20 "$INSTALL_LOG" 2>/dev/null || echo "No log available")
+    yad --title="$TITLE" \
+        --text="<b><span color='red'>Installation failed!</span></b>\n\nCheck the log for details:" \
+        --text-info --filename="$INSTALL_LOG" \
+        --button="Close:0" \
+        --width=600 --height=400 --center 2>/dev/null
+    exit 1
+fi
+
+# ── Step 5: Done ─────────────────────────────────────────────────────────────
+yad --title="$TITLE" \
+    --text="<b><big>Installation Complete!</big></b>\n\nSuperLite OS has been installed successfully to $DISK.\n\nYou can now reboot into your new system." \
+    --image="object-select" \
+    --button="Reboot!system-reboot:0" --button="Close!window-close:1" \
+    --width=$WIDTH --center 2>/dev/null
+
+[ $? -eq 0 ] && reboot
 INSTALLER_EOF
 
 # ── TUI Partition Manager ────────────────────────────────────────────────────

@@ -104,6 +104,7 @@ polkit
 grim
 slurp
 wtype
+yad
 
 # --- Networking ---
 networkmanager
