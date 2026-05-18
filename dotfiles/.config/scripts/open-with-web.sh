@@ -1,6 +1,6 @@
 #!/bin/sh
 # Open files with appropriate handler
-# PDF → browser, Office → Google Docs/Sheets/Slides
+# PDF → browser, Office → auto-upload to Google Docs/Sheets/Slides
 
 FILE="$1"
 
@@ -12,22 +12,19 @@ fi
 BASENAME=$(basename "$FILE")
 EXT="${BASENAME##*.}"
 EXT_LOWER=$(echo "$EXT" | tr '[:upper:]' '[:lower:]')
+UPLOAD_SCRIPT="$HOME/.config/scripts/google-upload.sh"
 
 case "$EXT_LOWER" in
     pdf)
         xdg-open "$FILE"
         ;;
-    doc|docx|odt|rtf)
-        notify-send "Opening in Google Docs" "$BASENAME"
-        xdg-open "https://docs.google.com/document/create"
-        ;;
-    xls|xlsx|ods|csv)
-        notify-send "Opening in Google Sheets" "$BASENAME"
-        xdg-open "https://sheets.google.com/create"
-        ;;
-    ppt|pptx|odp)
-        notify-send "Opening in Google Slides" "$BASENAME"
-        xdg-open "https://slides.google.com/create"
+    doc|docx|odt|rtf|xls|xlsx|ods|csv|ppt|pptx|odp)
+        if [ -f "$HOME/.config/google-drive/token.json" ]; then
+            "$UPLOAD_SCRIPT" "$FILE"
+        else
+            notify-send "Google Drive" "Belum setup. Jalankan: google-drive-setup.sh"
+            xdg-open "$FILE"
+        fi
         ;;
     *)
         xdg-open "$FILE"

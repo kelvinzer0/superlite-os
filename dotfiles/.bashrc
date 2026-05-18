@@ -14,6 +14,7 @@
  alias conf-bar='micro ~/.config/waybar/config'
  alias conf-term='micro ~/.config/foot/foot.ini'
  alias waykill='killall waybar && waybar &'
+ alias gdrive-setup='~/.config/scripts/google-drive-setup.sh'
 
 #alias dots='cd ~/code/dotfiles && lazygit'
 #alias labwc='dbus-launch --exit-with-session labwc'
