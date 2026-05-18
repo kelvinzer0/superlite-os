@@ -188,7 +188,18 @@ tape:x:1001:
 EOF
 
 # ── Copy dotfiles ─────────────────────────────────────────────────────────────
-DOTFILES_DIR="$SCRIPT_DIR/../../dotfiles"
+# Try multiple paths (original repo, aports tree symlink, Docker build)
+DOTFILES_DIR=""
+for dir in \
+    "$SCRIPT_DIR/../../dotfiles" \
+    "$SCRIPT_DIR/../dotfiles" \
+    "/build/dotfiles" \
+    "./dotfiles"; do
+    if [ -d "$dir" ] && [ -f "$dir/.profile" ]; then
+        DOTFILES_DIR="$dir"
+        break
+    fi
+done
 
 if [ -d "$DOTFILES_DIR" ]; then
     mkdir -p "$tmp"/etc/skel
