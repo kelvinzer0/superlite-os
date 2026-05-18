@@ -217,6 +217,39 @@ if [ -d "$DOTFILES_DIR" ]; then
     fi
 fi
 
+# ── Append boot mode handling to labwc autostart ──────────────────────────────
+# This reads /tmp/.bootmode (written by 00-boot-mode.sh) and launches
+# the appropriate GUI app after labwc and desktop services are ready.
+_bootmode_handler='
+
+# ── Boot mode handler (unified ISO) ──────────────────────────────────────────
+if [ -f /tmp/.bootmode ]; then
+    _bootmode=$(cat /tmp/.bootmode)
+    rm -f /tmp/.bootmode
+    case "$_bootmode" in
+        menu)
+            sleep 1
+            superlite-gui-menu &
+            ;;
+        install)
+            sleep 1
+            foot -T "SuperLite Installer" -e /usr/local/bin/superlite-installer &
+            ;;
+        parted)
+            sleep 1
+            foot -T "Partition Manager" -e /usr/local/bin/partman &
+            ;;
+    esac
+fi'
+
+# Append to root's autostart
+mkdir -p "$tmp"/root/.config/labwc
+printf '%s\n' "$_bootmode_handler" >> "$tmp"/root/.config/labwc/autostart
+
+# Append to skel's autostart (for new users)
+mkdir -p "$tmp"/etc/skel/.config/labwc
+printf '%s\n' "$_bootmode_handler" >> "$tmp"/etc/skel/.config/labwc/autostart
+
 # ── Shell profiles ────────────────────────────────────────────────────────────
 mkdir -p "$tmp"/etc/profile.d
 makefile root:root 0755 "$tmp"/etc/profile.d/xdg.sh <<'EOF'
@@ -263,10 +296,14 @@ makefile root:root 0755 "$tmp"/etc/profile.d/00-boot-mode.sh <<'BOOTMODE_EOF'
 case "$-" in *i*) ;; *) return 0 2>/dev/null || exit 0;; esac
 
 # Only run on tty1
-[ "$(tty)" != "/dev/tty1" ] && return 0 2>/dev/null || exit 0
+if [ "$(tty)" != "/dev/tty1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
 
 # Prevent running twice
-[ -f /tmp/.bootmode_done ] && return 0 2>/dev/null || exit 0
+if [ -f /tmp/.bootmode_done ]; then
+    return 0 2>/dev/null || exit 0
+fi
 touch /tmp/.bootmode_done 2>/dev/null
 
 # Read mode from kernel cmdline
@@ -277,93 +314,85 @@ for arg in $(cat /proc/cmdline 2>/dev/null); do
     esac
 done
 
+# Start seatd for all modes
+if ! pgrep -x seatd >/dev/null 2>&1; then
+    sudo rc-service seatd start 2>/dev/null || true
+    sleep 1
+fi
+
 case "$MODE" in
     install)
-        # ── Installer mode ───────────────────────────────────────────────
-        clear
-        echo ""
-        echo "  SuperLite OS — Installation Mode"
-        echo "  ─────────────────────────────────"
-        echo ""
-        exec /usr/local/bin/superlite-installer
+        # ── Installer mode (GUI via foot) ───────────────────────────────
+        echo "install" > /tmp/.bootmode
         ;;
     parted)
-        # ── Partition manager mode ───────────────────────────────────────
-        clear
-        echo ""
-        echo "  SuperLite OS — Partition Manager"
-        echo "  ─────────────────────────────────"
-        echo ""
-        exec /usr/local/bin/partman
+        # ── Partition manager mode (GUI via foot) ───────────────────────
+        echo "parted" > /tmp/.bootmode
         ;;
-    desktop|"")
-        # ── Desktop mode (default) ───────────────────────────────────────
-        if ! pgrep -x seatd >/dev/null 2>&1; then
-            sudo rc-service seatd start 2>/dev/null || true
-            sleep 1
-        fi
-        exec dbus-run-session labwc
+    desktop)
+        # ── Desktop mode (explicit, no menu) ────────────────────────────
+        # No flag file — autostart skips menu
         ;;
     *)
-        # Unknown mode — show menu
+        # ── No mode specified — show GUI boot menu ──────────────────────
+        echo "menu" > /tmp/.bootmode
         ;;
 esac
+
+exec dbus-run-session labwc
 BOOTMODE_EOF
 
-# ── Boot menu (fallback if no cmdline param) ──────────────────────────────────
+# ── Tofi boot menu config ─────────────────────────────────────────────────────
+mkdir -p "$tmp"/etc/tofi
+makefile root:root 0644 "$tmp"/etc/tofi/config_bootmenu <<'TOFI_EOF'
+width = 100%
+height = 100%
+padding-left = 14%
+padding-top = 38%
+horizontal = false
+result-spacing = 20
+num-results = 4
+prompt-text = "  SuperLite OS\n  Alpine · LabWC · Wayland\n\n  Choose mode:"
+min-input-width = 0
+font-size = 18
+font = JetBrains Mono Medium
+outline-width = 0
+border-width = 0
+background-color = #1a1a2e
+text-color = #e0e0e0
+selection-color = #22AA99
+selection-background = #16213e
+hint-font = false
+text-cursor = false
+hide-cursor = true
+hide-input = true
+drun-launch = false
+late-keyboard-init = true
+TOFI_EOF
+
+# ── GUI Boot Menu (tofi-based) ───────────────────────────────────────────────
 mkdir -p "$tmp"/usr/local/bin
-makefile root:root 0755 "$tmp"/usr/local/bin/superlite-menu <<'MENU_EOF'
+makefile root:root 0755 "$tmp"/usr/local/bin/superlite-gui-menu <<'MENU_EOF'
 #!/bin/sh
-# SuperLite OS — Boot Mode Menu
+# SuperLite OS — GUI Boot Menu (tofi)
 # Shown when no superlite.mode= kernel parameter is set
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+choice=$(printf "Desktop\nInstall\nPartition Manager\nShell" | tofi -c /etc/tofi/config_bootmenu)
 
-while true; do
-    clear
-    printf "${CYAN}${BOLD}"
-    printf "  ╔══════════════════════════════════════════╗\n"
-    printf "  ║           SuperLite OS                   ║\n"
-    printf "  ║     Alpine · LabWC · Wayland             ║\n"
-    printf "  ╠══════════════════════════════════════════╣\n"
-    printf "  ║                                          ║\n"
-    printf "  ║   ${GREEN}1${CYAN})  Desktop          ${BOLD}(live session)${NC}${CYAN}${BOLD}  ║\n"
-    printf "  ║   ${GREEN}2${CYAN})  Install          ${BOLD}(partition + setup)${NC}${CYAN}${BOLD} ║\n"
-    printf "  ║   ${GREEN}3${CYAN})  Partition Manager ${BOLD}(disk tools)${NC}${CYAN}${BOLD}  ║\n"
-    printf "  ║   ${GREEN}4${CYAN})  Shell            ${BOLD}(bare terminal)${NC}${CYAN}${BOLD}  ║\n"
-    printf "  ║                                          ║\n"
-    printf "  ╚══════════════════════════════════════════╝${NC}\n"
-    printf "\n"
-    printf "  Choose [1-4]: "
-    read -r choice
-
-    case "$choice" in
-        1)
-            if ! pgrep -x seatd >/dev/null 2>&1; then
-                sudo rc-service seatd start 2>/dev/null || true
-                sleep 1
-            fi
-            exec dbus-run-session labwc
-            ;;
-        2)
-            exec /usr/local/bin/superlite-installer
-            ;;
-        3)
-            exec /usr/local/bin/partman
-            ;;
-        4)
-            exec /bin/sh
-            ;;
-        *)
-            printf "  ${RED}Invalid choice${NC}\n"
-            sleep 1
-            ;;
-    esac
-done
+case "$choice" in
+    Desktop)
+        # Desktop is already running (autostart), do nothing
+        ;;
+    Install)
+        foot -T "SuperLite Installer" -e /usr/local/bin/superlite-installer
+        ;;
+    "Partition Manager")
+        foot -T "Partition Manager" -e /usr/local/bin/partman
+        ;;
+    Shell)
+        foot -T "Shell"
+        ;;
+esac
 MENU_EOF
 
 # ── Dynamic MOTD ──────────────────────────────────────────────────────────────
