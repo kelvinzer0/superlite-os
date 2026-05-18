@@ -11,5 +11,5 @@ SELECTED=$(find $SEARCH_DIRS -maxdepth 5 -type f \
     | tofi --prompt-text "File > " --num-results 10)
 
 if [ -n "$SELECTED" ]; then
-    xdg-open "$HOME/$SELECTED"
+    "$HOME/.config/scripts/open-with-web.sh" "$HOME/$SELECTED"
 fi

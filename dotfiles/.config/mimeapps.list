@@ -1,0 +1,12 @@
+[Default Applications]
+application/pdf=firefox.desktop
+application/msword=open-with-web.desktop
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=open-with-web.desktop
+application/vnd.ms-excel=open-with-web.desktop
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=open-with-web.desktop
+application/vnd.ms-powerpoint=open-with-web.desktop
+application/vnd.openxmlformats-officedocument.presentationml.presentation=open-with-web.desktop
+application/vnd.oasis.opendocument.text=open-with-web.desktop
+application/vnd.oasis.opendocument.spreadsheet=open-with-web.desktop
+application/vnd.oasis.opendocument.presentation=open-with-web.desktop
+text/csv=open-with-web.desktop
