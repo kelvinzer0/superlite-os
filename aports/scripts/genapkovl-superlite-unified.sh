@@ -539,12 +539,46 @@ INSTALL_LOG="/tmp/superlite-install.log"
 
     # Phase 5: Copy desktop config (85-95%)
     echo "85" ; echo "# Installing desktop environment..."
-    [ -d /etc/skel ] && cp -a /etc/skel/.* /mnt/root/ 2>/dev/null || true
-    cp /etc/motd /mnt/etc/motd 2>/dev/null || true
-    # Copy overlay configs
-    for d in labwc foot waybar mako tofi; do
-        [ -d "/root/.config/$d" ] && cp -a "/root/.config/$d" /mnt/root/.config/ 2>/dev/null || true
+
+    # Copy all dotfiles from skel to installed root
+    if [ -d /etc/skel ]; then
+        mkdir -p /mnt/root
+        for item in /etc/skel/.*; do
+            name="$(basename "$item")"
+            [ "$name" = "." ] || [ "$name" = ".." ] && continue
+            cp -a "$item" /mnt/root/ 2>/dev/null || true
+        done
+    fi
+
+    # Copy live session configs (may have runtime changes)
+    mkdir -p /mnt/root/.config
+    for item in /root/.config/*; do
+        [ -e "$item" ] && cp -a "$item" /mnt/root/.config/ 2>/dev/null || true
     done
+
+    # Copy wallpapers, icons, fonts
+    [ -d /root/Pictures ] && cp -a /root/Pictures /mnt/root/ 2>/dev/null || true
+    [ -d /root/.icons ] && cp -a /root/.icons /mnt/root/ 2>/dev/null || true
+
+    # Copy system-wide assets
+    [ -d /usr/share/fonts ] && cp -a /usr/share/fonts /mnt/usr/share/ 2>/dev/null || true
+    [ -d /usr/share/icons ] && cp -a /usr/share/icons /mnt/usr/share/ 2>/dev/null || true
+
+    # Copy MOTD
+    cp /etc/motd /mnt/etc/motd 2>/dev/null || true
+
+    # Ensure correct ownership
+    chroot /mnt chown -R root:root /root 2>/dev/null || true
+
+    # Verify dotfiles installed
+    echo "# Verifying installation..."
+    _missing=""
+    for f in .profile .config/labwc/autostart .config/labwc/rc.xml .config/waybar/config .config/foot/foot.ini; do
+        [ ! -f "/mnt/root/$f" ] && _missing="$_missing $f"
+    done
+    if [ -n "$_missing" ]; then
+        echo "# WARNING: Missing files:$_missing" >> "$INSTALL_LOG"
+    fi
 
     # Phase 6: Bootloader (95-100%)
     echo "95" ; echo "# Installing bootloader..."
