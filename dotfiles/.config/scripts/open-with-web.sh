@@ -18,12 +18,28 @@ case "$EXT_LOWER" in
     pdf)
         xdg-open "$FILE"
         ;;
-    doc|docx|odt|rtf|xls|xlsx|ods|csv|ppt|pptx|odp)
+    doc|docx|odt|rtf)
         if [ -f "$HOME/.config/google-drive/token.json" ]; then
             "$UPLOAD_SCRIPT" "$FILE"
         else
-            notify-send "Google Drive" "Belum setup. Jalankan: google-drive-setup.sh"
-            xdg-open "$FILE"
+            notify-send "Google Drive" "Setup belum ada, buka Google Docs manual"
+            xdg-open "https://docs.google.com/document/create"
+        fi
+        ;;
+    xls|xlsx|ods|csv)
+        if [ -f "$HOME/.config/google-drive/token.json" ]; then
+            "$UPLOAD_SCRIPT" "$FILE"
+        else
+            notify-send "Google Drive" "Setup belum ada, buka Google Sheets manual"
+            xdg-open "https://sheets.google.com/create"
+        fi
+        ;;
+    ppt|pptx|odp)
+        if [ -f "$HOME/.config/google-drive/token.json" ]; then
+            "$UPLOAD_SCRIPT" "$FILE"
+        else
+            notify-send "Google Drive" "Setup belum ada, buka Google Slides manual"
+            xdg-open "https://slides.google.com/create"
         fi
         ;;
     *)
