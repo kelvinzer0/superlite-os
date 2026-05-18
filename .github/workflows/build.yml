@@ -56,6 +56,7 @@ jobs:
             -m 4096 \
             -nographic \
             -no-reboot \
+            -device VGA \
             -cdrom $env(ISO_PATH) \
             -boot d \
             -serial mon:stdio
