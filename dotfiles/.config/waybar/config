@@ -10,7 +10,7 @@
     // Choose the order of the modules
     "modules-left": ["wlr/taskbar"],
     //"modules-center": ["clock"],    
-    "modules-right": ["clock", "custom/gammastep", "custom/write", "network", "battery"],
+    "modules-right": ["clock", "custom/gammastep", "network", "battery"],
     // Modules configuration
 
 "custom/openvpn": {
@@ -46,14 +46,7 @@
                }   
     },
 
-    "custom/crypto": {
-        "format": "  <span color='#666'>::</span>  {}",
-        "interval": 600,
-        "return-type": "json",
-        "exec": "~/.config/waybar/modules/crypto/waybar_crypto.py",
-        "exec-if": "ping pro-api.coinmarketcap.com -c1",
-        "on-click": "firefox --new-tab https://it.tradingview.com"
-    },
+
     "custom/command": {
       "format": "RUN  <span color='#666'>::</span>  ",
 //		"format": "RUN",
@@ -61,13 +54,7 @@
         "on-click": "tofi-drun",
         "tooltip": false
     },
-    "custom/write": {
-		"format": "",
- //       "on-click-right": "$HOME/.config/scripts/tofi-power.sh",
-       "on-click": "foot --title=Diary --override=font=JetbrainsMono:size=14 wordgrinder ~/note/start.wg",
-//        "on-click": "xwordgrinder ~/note/start.wg",
-        "tooltip": false
-    },
+
 
      "custom/vpn": {
             "format": "VPN [{}]",

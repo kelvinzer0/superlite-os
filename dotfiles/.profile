@@ -35,8 +35,7 @@ alias waykill='killall waybar && waybar &'
 #alias dots='cd ~/code/dotfiles && lazygit'
 alias labwc='dbus-run-session labwc'
 
-#alias wg="setfont /usr/share/consolefonts/ter-v28b.psf.gz; wordgrinder note/new.wg; setfont /usr/share/consolefonts/ter-112n.psf.gz; clear"
-#alias wr="setfont /usr/share/consolefonts/ter-v24b.psf.gz; micro -statusline false -ruler false note/todo.md; setfont /usr/share/consolefonts/ter-112n.psf.gz; clear"
+
 
 
 #PS1='[\u@\h \W]\$ '

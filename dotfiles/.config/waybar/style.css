@@ -101,16 +101,6 @@ button:hover {
     color: #64748b;
 }
 
-/* ── Write/Diary ── */
-#custom-write {
-    padding: 0 6px;
-    color: #94a3b8;
-    transition: color 0.2s ease;
-}
-
-#custom-write:hover {
-    color: #e2e8f0;
-}
 
 /* ── Network ── */
 #network {

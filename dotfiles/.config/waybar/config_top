@@ -7,7 +7,7 @@
     "spacing": 2, // Gaps between modules (4px)
     //"exclusive": false,
     // Choose the order of the modules
- //   "modules-left": ["custom/vpn", "custom/crypto"],
+ //   "modules-left": ["custom/vpn"],
   //  "modules-center": ["clock"],
 	"modules-left": ["clock#day", "clock", "clock#time", "wlr/taskbar"],
     "modules-right": [ "network", "custom/vpn", "bluetooth", "custom/gammastep", "idle_inhibitor", "custom/pacman", "battery"],
@@ -25,14 +25,6 @@
                }   
     },
 
-    "custom/crypto": {
-        "format": "  <span color='#666'>::</span>  {}",
-        "interval": 600,
-        "return-type": "json",
-        "exec": "~/.config/waybar/modules/crypto/waybar_crypto.py",
-        "exec-if": "ping pro-api.coinmarketcap.com -c1",
-        "on-click": "firefox --new-tab https://it.tradingview.com"
-    },
     "custom/pacman": {
     "align": 1,
         "format": "{} OS UPDATES",
