@@ -22,4 +22,4 @@ find "$ICON_DIR" -name "*.svg" | while read f; do
         "$f"
 done
 
-echo "Done. Restart PCManFM to see changes."
+echo "Done. Restart Thunar to see changes."

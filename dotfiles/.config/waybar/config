@@ -18,7 +18,7 @@
         "rewrite": {
             "Firefox": "",
             "Foot": "Terminal",
-            "File Manager PCManFM": "Files",
+            "Thunar": "Files",
             "Code - OSS - URL Handler": "Code",
             "Telegram Desktop": "Telegram",
             "mpv Media Player": "mpv",

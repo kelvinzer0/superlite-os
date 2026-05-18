@@ -16,7 +16,7 @@
 	<separator/>
 	<menu id="Power" label="Tool">
 		<item label="File">
-			<action name="Execute"><command>pcmanfm</command></action>
+			<action name="Execute"><command>thunar</command></action>
 		</item>
 		<item label="E-Mail">
 			<action name="Execute"><command>thunderbird</command></action>
@@ -52,7 +52,7 @@
 
 	<menu id="Wallpaper" label="Wallpaper">
 		<item label="Browse...">
-			<action name="Execute"><command>pcmanfm ~/Pictures/wallpapers</command></action>
+			<action name="Execute"><command>thunar ~/Pictures/wallpapers</command></action>
 		</item>
 		<separator/>
 		<item label="Default Wallpaper">

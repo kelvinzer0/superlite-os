@@ -13,7 +13,9 @@ busybox-suid
 busybox-static
 busybox-extras
 kmod
-pcmanfm
+thunar
+thunar-volman
+gvfs
 imv
 mpv
 wf-recorder
