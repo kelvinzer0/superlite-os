@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
-   SuperLite OS — Modern Glass Theme
-   Clean, minimal, dark glassmorphism style
+   SuperLite OS — Minimalis Clean Theme
+   Flat, light, pill-shaped modules, spacious
    ═══════════════════════════════════════════════════════ */
 
 * {
@@ -14,10 +14,10 @@
 
 /* ── Bar ── */
 window#waybar {
-    background: rgba(18, 18, 24, 0.85);
+    background: #f8f9fa;
     border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    color: #e0e0e0;
+    border-top: 1px solid #e9ecef;
+    color: #1a1a2e;
 }
 
 window#waybar.hidden {
@@ -27,14 +27,14 @@ window#waybar.hidden {
 /* ── Buttons ── */
 button {
     border: none;
-    border-radius: 6px;
-    padding: 0 8px;
+    border-radius: 20px;
+    padding: 0 12px;
     background: transparent;
     color: inherit;
 }
 
 button:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: #e9ecef;
 }
 
 /* ── Taskbar ── */
@@ -43,23 +43,22 @@ button:hover {
 }
 
 #taskbar button {
-    padding: 3px 10px;
-    margin: 0 2px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #aaa;
+    padding: 4px 12px;
+    margin: 0 3px;
+    border-radius: 20px;
+    background: #e9ecef;
+    color: #495057;
     transition: all 0.2s ease;
 }
 
 #taskbar button:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
+    background: #dee2e6;
+    color: #1a1a2e;
 }
 
 #taskbar button.active {
-    background: rgba(139, 92, 246, 0.3);
-    color: #c4b5fd;
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    background: #4361ee;
+    color: #ffffff;
 }
 
 /* ── Module containers ── */
@@ -71,74 +70,67 @@ button:hover {
 .modules-right {
     padding: 4px 10px;
     margin: 4px 8px;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: #e9ecef;
+    border-radius: 20px;
+}
+
+/* ── Search ── */
+#custom-search {
+    padding: 0 10px;
+    border-radius: 20px;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+#custom-search:hover {
+    background: #dee2e6;
+    color: #1a1a2e;
 }
 
 /* ── Clock ── */
 #clock {
-    padding: 0 8px;
-    color: #f0f0f0;
+    padding: 0 10px;
+    color: #1a1a2e;
     font-weight: 600;
-    letter-spacing: 0.3px;
 }
-
-/* ── Gammastep toggle ── */
-#custom-gammastep {
-    padding: 0 6px;
-    border-radius: 6px;
-    color: #94a3b8;
-    transition: all 0.2s ease;
-}
-
-#custom-gammastep.active {
-    color: #fbbf24;
-    background: rgba(251, 191, 36, 0.1);
-}
-
-#custom-gammastep.inactive {
-    color: #64748b;
-}
-
 
 /* ── Network ── */
 #network {
-    padding: 0 6px;
-    color: #94a3b8;
+    padding: 0 8px;
+    color: #495057;
     transition: color 0.2s ease;
 }
 
 #network:hover {
-    color: #e2e8f0;
+    color: #1a1a2e;
 }
 
 #network.disconnected,
 #network.disabled {
-    color: #475569;
+    color: #adb5bd;
 }
 
 /* ── Battery ── */
 #battery {
-    padding: 0 6px;
-    color: #94a3b8;
+    padding: 0 8px;
+    color: #495057;
     transition: color 0.2s ease;
 }
 
 #battery.charging {
-    color: #34d399;
+    color: #2b9348;
 }
 
 #battery.plugged {
-    color: #6ee7b7;
+    color: #55a630;
 }
 
 @keyframes blink {
-    to { color: #ef4444; }
+    to { color: #e63946; }
 }
 
 #battery.critical:not(.charging) {
-    color: #f87171;
+    color: #e63946;
     animation-name: blink;
     animation-duration: 0.8s;
     animation-timing-function: steps(2, start);
@@ -147,133 +139,20 @@ button:hover {
 }
 
 #battery.warning:not(.charging) {
-    color: #fbbf24;
-}
-
-/* ── VPN ── */
-#custom-openvpn {
-    padding: 0 6px;
-    color: #ef4444;
-    font-weight: 600;
-}
-
-/* ── Bluetooth ── */
-#bluetooth {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-#bluetooth.disabled,
-#bluetooth.off {
-    color: #475569;
-}
-
-/* ── Idle inhibitor ── */
-#idle_inhibitor {
-    padding: 0 6px;
-    color: #64748b;
-}
-
-#idle_inhibitor.activated {
-    color: #fbbf24;
-}
-
-/* ── CPU ── */
-#cpu {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-/* ── Memory ── */
-#memory {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-/* ── Temperature ── */
-#temperature {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-#temperature.critical {
-    color: #ef4444;
-}
-
-/* ── Backlight ── */
-#backlight {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-/* ── PulseAudio ── */
-#pulseaudio {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-#pulseaudio.muted {
-    color: #475569;
-}
-
-/* ── Tray ── */
-#tray {
-    padding: 0 6px;
-    color: #94a3b8;
-}
-
-#tray > .passive {
-    -gtk-icon-effect: dim;
-}
-
-#tray > .needs-attention {
-    -gtk-icon-effect: highlight;
-    color: #fbbf24;
-}
-
-/* ── Keyboard ── */
-#keyboard-state {
-    padding: 0 6px;
-    color: #94a3b8;
-    min-width: 16px;
-}
-
-#keyboard-state > label {
-    padding: 0 4px;
-}
-
-#keyboard-state > label.locked {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-}
-
-/* ── Language ── */
-#language {
-    padding: 0 6px;
-    color: #94a3b8;
-    min-width: 16px;
-}
-
-/* ── Scratchpad ── */
-#scratchpad {
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 6px;
-}
-
-#scratchpad.empty {
-    background: transparent;
+    color: #f77f00;
 }
 
 /* ── Tooltip ── */
 tooltip {
-    background: rgba(24, 24, 32, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #ffffff;
+    border: 1px solid #e9ecef;
     border-radius: 8px;
     padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 tooltip label {
-    color: #e0e0e0;
+    color: #1a1a2e;
     padding: 6px 10px;
     font-size: 11px;
 }

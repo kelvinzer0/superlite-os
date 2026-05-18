@@ -213,6 +213,9 @@
     <!--   <action name="ToggleMaximize"/> -->
     <!-- </keybind> -->
     <keybind key="W-f">
+      <action name="Execute" command="$HOME/.config/scripts/file-search.sh"/>
+    </keybind>
+    <keybind key="W-S-f">
       <action name="ToggleFullscreen"/>
     </keybind>
     
