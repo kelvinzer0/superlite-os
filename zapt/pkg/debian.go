@@ -9,10 +9,20 @@ import (
 	"strings"
 )
 
+// Supported architectures (like debianpool-searcher)
+var DebianArchitectures = []string{
+	"amd64",
+	"i386",
+	"arm64",
+	"armhf",
+	"ppc64el",
+	"mips64el",
+	"s390x",
+	"all",
+}
+
 // DebianSearch searches Debian package repositories
 func DebianSearch(src Source, query string) ([]Package, error) {
-	// Build URL for Packages.gz
-	// Format: http://deb.debian.org/debian/dists/stable/main/binary-amd64/Packages.gz
 	dist := src.Dist
 	if dist == "" {
 		dist = "stable"
@@ -22,12 +32,28 @@ func DebianSearch(src Source, query string) ([]Package, error) {
 		comp = "main"
 	}
 
-	url := fmt.Sprintf("http://%s/dists/%s/%s/binary-amd64/Packages.gz", src.URL, dist, comp)
+	var allPkgs []Package
 
-	// Download Packages.gz
+	// Search across multiple architectures
+	for _, arch := range DebianArchitectures {
+		url := fmt.Sprintf("http://%s/dists/%s/%s/binary-%s/Packages.gz", src.URL, dist, comp, arch)
+
+		pkgs, err := searchDebianURL(url, query, arch)
+		if err != nil {
+			// Silently skip failed architectures
+			continue
+		}
+		allPkgs = append(allPkgs, pkgs...)
+	}
+
+	return allPkgs, nil
+}
+
+// searchDebianURL searches a specific Debian Packages.gz URL
+func searchDebianURL(url, query, arch string) ([]Package, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("http get: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -35,14 +61,12 @@ func DebianSearch(src Source, query string) ([]Package, error) {
 		return nil, fmt.Errorf("http status: %d", resp.StatusCode)
 	}
 
-	// Decompress gzip
 	gz, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("gzip reader: %w", err)
+		return nil, err
 	}
 	defer gz.Close()
 
-	// Parse and search
 	return parsePackagesIndex(gz, query, "debian")
 }
 
@@ -58,7 +82,6 @@ func parsePackagesIndex(r io.Reader, query string, source string) ([]Package, er
 		line := scanner.Text()
 
 		if line == "" {
-			// End of package entry
 			if inPackage && matchesQuery(currentPkg.Name, currentPkg.Description, query) {
 				currentPkg.Source = source
 				pkgs = append(pkgs, currentPkg)
@@ -69,7 +92,6 @@ func parsePackagesIndex(r io.Reader, query string, source string) ([]Package, er
 		}
 
 		if strings.HasPrefix(line, " ") {
-			// Continuation line, skip
 			continue
 		}
 
@@ -87,10 +109,11 @@ func parsePackagesIndex(r io.Reader, query string, source string) ([]Package, er
 			currentPkg.Version = value
 		case "Description":
 			currentPkg.Description = value
+		case "Architecture":
+			// Store arch info if needed
 		}
 	}
 
-	// Handle last package
 	if inPackage && matchesQuery(currentPkg.Name, currentPkg.Description, query) {
 		currentPkg.Source = source
 		pkgs = append(pkgs, currentPkg)
@@ -104,4 +127,50 @@ func matchesQuery(name, desc, query string) bool {
 	q := strings.ToLower(query)
 	return strings.Contains(strings.ToLower(name), q) ||
 		strings.Contains(strings.ToLower(desc), q)
+}
+
+// FindSimilar finds similar package names (like debianpool-searcher's similar_text)
+func FindSimilar(query string, allPkgs []Package, threshold float64) []Package {
+	var similar []Package
+	q := strings.ToLower(query)
+
+	for _, pkg := range allPkgs {
+		percent := similarity(q, strings.ToLower(pkg.Name))
+		if percent > threshold {
+			similar = append(similar, pkg)
+		}
+	}
+
+	return similar
+}
+
+// similarity calculates string similarity (0-100)
+func similarity(a, b string) float64 {
+	if a == b {
+		return 100
+	}
+
+	// Simple Levenshtein-based similarity
+	lenA := len(a)
+	lenB := len(b)
+	if lenA == 0 || lenB == 0 {
+		return 0
+	}
+
+	// Count matching characters
+	matches := 0
+	for i := 0; i < lenA && i < lenB; i++ {
+		if a[i] == b[i] {
+			matches++
+		}
+	}
+
+	return float64(matches) / float64(max(lenA, lenB)) * 100
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
