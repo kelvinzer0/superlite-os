@@ -228,6 +228,62 @@ if [ -d "$DOTFILES_DIR" ]; then
     fi
 fi
 
+# ── Recolor and convert SVG icons to PNG ─────────────────────────────────────
+# The icon theme SVGs use placeholder colors; recolor to match UI accent (#22AA99)
+# and convert to PNG for reliable rendering in Thunar and other GTK apps.
+_ACCENT="#22AA99"
+_DARK="#0F766E"
+_LIGHT="#5EEAD4"
+_ICON_SVG_DIR="$tmp/root/.icons/superlite/scalable"
+_ICON_PNG_DIR="$tmp/root/.icons/superlite/48x48"
+
+if [ -d "$_ICON_SVG_DIR" ] && command -v rsvg-convert >/dev/null 2>&1; then
+    echo "Recoloring and converting SVG icons to PNG..."
+    for subdir in places actions devices mimetypes; do
+        [ -d "$_ICON_SVG_DIR/$subdir" ] || continue
+        mkdir -p "$_ICON_PNG_DIR/$subdir"
+        for svg in "$_ICON_SVG_DIR/$subdir"/*.svg; do
+            [ -f "$svg" ] || continue
+            # Recolor SVG in-place (accent color substitution)
+            sed -i \
+                -e "s/fill=\"#8B5CF6\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#7C3AED\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#A78BFA\"/fill=\"$_LIGHT\"/g" \
+                -e "s/fill=\"#34D399\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#10B981\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#60A5FA\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#3B82F6\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#F87171\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#EF4444\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#F472B6\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#EC4899\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#FBBF24\"/fill=\"$_ACCENT\"/g" \
+                -e "s/fill=\"#F59E0B\"/fill=\"$_DARK\"/g" \
+                -e "s/fill=\"#D1FAE5\"/fill=\"#CCFBF1\"/g" \
+                -e "s/fill=\"#A7F3D0\"/fill=\"#99F6E4\"/g" \
+                -e "s/fill=\"#DDD6FE\"/fill=\"#CCFBF1\"/g" \
+                -e "s/fill=\"#C4B5FD\"/fill=\"#99F6E4\"/g" \
+                -e "s/fill=\"#FDE68A\"/fill=\"#CCFBF1\"/g" \
+                -e "s/fill=\"#FCD34D\"/fill=\"#99F6E4\"/g" \
+                -e "s/fill=\"#E2E8F0\"/fill=\"#F0FDFA\"/g" \
+                -e "s/fill=\"#CBD5E1\"/fill=\"#CCFBF1\"/g" \
+                -e "s/fill=\"#FECACA\"/fill=\"#CCFBF1\"/g" \
+                -e "s/fill=\"#FCA5A5\"/fill=\"#99F6E4\"/g" \
+                "$svg"
+            # Convert to PNG
+            name=$(basename "$svg" .svg)
+            rsvg-convert -w 48 -h 48 "$svg" -o "$_ICON_PNG_DIR/$subdir/$name.png" 2>/dev/null || true
+        done
+    done
+    echo "Icon conversion complete."
+fi
+
+# Also generate PNGs for skel (copy from root's processed icons)
+if [ -d "$_ICON_PNG_DIR" ]; then
+    mkdir -p "$tmp"/etc/skel/.icons/superlite/48x48
+    cp -a "$_ICON_PNG_DIR"/* "$tmp"/etc/skel/.icons/superlite/48x48/ 2>/dev/null || true
+fi
+
 # ── Build and install zapt ────────────────────────────────────────────────────
 # zapt is a Go-based multi-source package manager
 ZAPT_DIR=""
@@ -244,12 +300,9 @@ done
 
 if [ -n "$ZAPT_DIR" ] && command -v go >/dev/null 2>&1; then
     echo "Building zapt..."
-    _prev_dir=$(pwd)
-    cd "$ZAPT_DIR"
-    CGO_ENABLED=0 go build -ldflags="-s -w" -o "$tmp"/usr/local/bin/zapt . 2>/dev/null || {
+    (cd "$ZAPT_DIR" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "$tmp"/usr/local/bin/zapt .) 2>/dev/null || {
         echo "Warning: zapt build failed"
     }
-    cd "$_prev_dir"
 
     # Install zapt config
     mkdir -p "$tmp"/etc/zapt
@@ -473,178 +526,227 @@ makefile root:root 0755 "$tmp"/usr/local/bin/superlite-gui-installer <<'INSTALLE
 #!/bin/sh
 # ============================================================================
 # SuperLite OS — GUI Installer (yad)
-# Simple wizard: select disk → confirm → auto install → done
+# Wizard with Previous/Next navigation
 # ============================================================================
 set -e
 
 TITLE="SuperLite OS Installer"
 WIDTH=480
+STEP=1
+DISK=""
+SELECTED=""
 
-# ── Step 1: Welcome ──────────────────────────────────────────────────────────
-yad --title="$TITLE" \
-    --text="<b><big>Welcome to SuperLite OS</big></b>\n\nThis wizard will install SuperLite OS to your computer.\n\n<b>Warning:</b> All data on the selected disk will be erased!\n\n<tt>Alpine Linux + LabWC Wayland</tt>" \
-    --image="drive-harddisk" \
-    --button="Next!go-next:0" --button="Cancel!cancel:1" \
-    --width=$WIDTH --center 2>/dev/null
-[ $? -ne 0 ] && exit 0
-
-# ── Step 2: Select disk ──────────────────────────────────────────────────────
-# Build disk list for yad --list
-DISK_LIST=""
-while IFS= read -r line; do
-    name=$(echo "$line" | awk '{print $1}')
-    size=$(echo "$line" | awk '{print $2}')
-    model=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ *$//')
-    [ -z "$model" ] && model="(unknown)"
-    DISK_LIST="$DISK_LIST FALSE /dev/$name $size $model"
-done <<EOF
+# ── Build disk list ──────────────────────────────────────────────────────────
+build_disk_list() {
+    DISK_LIST=""
+    while IFS= read -r line; do
+        name=$(echo "$line" | awk '{print $1}')
+        size=$(echo "$line" | awk '{print $2}')
+        model=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ *$//')
+        [ -z "$model" ] && model="(unknown)"
+        DISK_LIST="$DISK_LIST FALSE /dev/$name $size $model"
+    done <<EOF
 $(lsblk -dno NAME,SIZE,MODEL 2>/dev/null | grep -v "loop\|rom\|sr")
 EOF
+}
 
-if [ -z "$DISK_LIST" ]; then
-    yad --title="$TITLE" --error --text="No disks found!" --width=$WIDTH --center 2>/dev/null
-    exit 1
-fi
+# ── Main wizard loop ─────────────────────────────────────────────────────────
+while true; do
+    case "$STEP" in
+        1)
+            # Welcome
+            yad --title="$TITLE" \
+                --text="<b><big>Welcome to SuperLite OS</big></b>\n\nThis wizard will install SuperLite OS to your computer.\n\n<b>Warning:</b> All data on the selected disk will be erased!\n\n<tt>Alpine Linux + LabWC Wayland</tt>" \
+                --image="drive-harddisk" \
+                --button="Next!go-next:0" --button="Cancel!cancel:1" \
+                --width=$WIDTH --center 2>/dev/null
+            RC=$?
+            if [ $RC -eq 1 ] || [ $RC -eq 252 ]; then
+                exit 0
+            fi
+            STEP=2
+            ;;
+        2)
+            # Select disk
+            build_disk_list
+            if [ -z "$DISK_LIST" ]; then
+                yad --title="$TITLE" --error --text="No disks found!" --width=$WIDTH --center 2>/dev/null
+                exit 1
+            fi
 
-SELECTED=$(yad --title="$TITLE" \
-    --text="<b>Select the target disk:</b>" \
-    --list --radiolist --column="" --column="Device" --column="Size" --column="Model" \
-    --print-column=2 --separator="" \
-    --button="Next!go-next:0" --button="Cancel!cancel:1" \
-    --width=$WIDTH --height=300 --center 2>/dev/null \
-    $DISK_LIST)
+            SELECTED=$(yad --title="$TITLE" \
+                --text="<b>Select the target disk:</b>" \
+                --list --radiolist --column="" --column="Device" --column="Size" --column="Model" \
+                --print-column=2 --separator="" \
+                --button="Previous!go-previous:2" --button="Next!go-next:0" --button="Cancel!cancel:1" \
+                --width=$WIDTH --height=300 --center 2>/dev/null \
+                $DISK_LIST)
+            RC=$?
+            if [ $RC -eq 1 ] || [ $RC -eq 252 ]; then
+                exit 0
+            elif [ $RC -eq 2 ]; then
+                STEP=1
+                continue
+            fi
+            DISK=$(echo "$SELECTED" | sed 's/^ *//;s/ *$//')
+            if [ -z "$DISK" ] || [ ! -b "$DISK" ]; then
+                yad --title="$TITLE" --error --text="No disk selected!" --width=$WIDTH --center 2>/dev/null
+                continue
+            fi
+            STEP=3
+            ;;
+        3)
+            # Confirm
+            DISK_SIZE=$(lsblk -dno SIZE "$DISK" 2>/dev/null | tr -d ' ')
+            DISK_MODEL=$(lsblk -dno MODEL "$DISK" 2>/dev/null | sed 's/^ *//;s/ *$//')
 
-[ $? -ne 0 ] && exit 0
-DISK=$(echo "$SELECTED" | sed 's/^ *//;s/ *$//')
+            yad --title="$TITLE" \
+                --text="<b><big>Confirm Installation</big></b>\n\n<b>Target:</b> $DISK ($DISK_SIZE)\n<b>Model:</b> $DISK_MODEL\n\n<b><span color='red'>ALL DATA ON THIS DISK WILL BE ERASED!</span></b>\n\nThe disk will be partitioned automatically:\n- EFI System Partition (512 MB)\n- Swap (${DISK_SIZE} / 10, max 2 GB)\n- Root filesystem (ext4, remaining space)" \
+                --image="dialog-warning" \
+                --question --button="Previous!go-previous:2" --button="Install!apply:0" --button="Cancel!cancel:1" \
+                --width=$WIDTH --center 2>/dev/null
+            RC=$?
+            if [ $RC -eq 1 ] || [ $RC -eq 252 ]; then
+                exit 0
+            elif [ $RC -eq 2 ]; then
+                STEP=2
+                continue
+            fi
+            STEP=4
+            ;;
+        4)
+            # Install
+            INSTALL_LOG="/tmp/superlite-install.log"
 
-if [ -z "$DISK" ] || [ ! -b "$DISK" ]; then
-    yad --title="$TITLE" --error --text="No disk selected!" --width=$WIDTH --center 2>/dev/null
-    exit 1
-fi
+            {
+                # Phase 1: Partition (0-25%)
+                echo "5" ; echo "# Partitioning $DISK..."
+                wipefs -a "$DISK" 2>/dev/null || true
+                parted -s "$DISK" mklabel gpt
+                parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
+                parted -s "$DISK" set 1 esp on
+                size_mb=$(blockdev --getsize64 "$DISK" | awk '{printf "%.0f", $1/1024/1024}')
+                swap_mb=$((size_mb / 10)); [ "$swap_mb" -gt 2048 ] && swap_mb=2048
+                swap_end=$((513 + swap_mb))
+                parted -s "$DISK" mkpart primary linux-swap 513MiB "${swap_end}MiB"
+                parted -s "$DISK" mkpart primary ext4 "${swap_end}MiB" 100%
+                case "$DISK" in *nvme*) sep="p";; *) sep="";; esac
 
-# ── Step 3: Confirm ──────────────────────────────────────────────────────────
-DISK_SIZE=$(lsblk -dno SIZE "$DISK" 2>/dev/null | tr -d ' ')
-DISK_MODEL=$(lsblk -dno MODEL "$DISK" 2>/dev/null | sed 's/^ *//;s/ *$//')
+                # Phase 2: Format (25-40%)
+                echo "25" ; echo "# Formatting partitions..."
+                mkfs.fat -F32 "${DISK}${sep}1" >> "$INSTALL_LOG" 2>&1
+                mkswap "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
+                mkfs.ext4 -F "${DISK}${sep}3" >> "$INSTALL_LOG" 2>&1
 
-yad --title="$TITLE" \
-    --text="<b><big>Confirm Installation</big></b>\n\n<b>Target:</b> $DISK ($DISK_SIZE)\n<b>Model:</b> $DISK_MODEL\n\n<b><span color='red'>ALL DATA ON THIS DISK WILL BE ERASED!</span></b>\n\nThe disk will be partitioned automatically:\n- EFI System Partition (512 MB)\n- Swap (${DISK_SIZE} / 10, max 2 GB)\n- Root filesystem (ext4, remaining space)" \
-    --image="dialog-warning" \
-    --question --button="Install!apply:0" --button="Cancel!cancel:1" \
-    --width=$WIDTH --center 2>/dev/null
-[ $? -ne 0 ] && exit 0
+                # Phase 3: Mount (40-50%)
+                echo "40" ; echo "# Mounting partitions..."
+                mount "${DISK}${sep}3" /mnt
+                mkdir -p /mnt/boot/efi
+                mount "${DISK}${sep}1" /mnt/boot/efi
+                swapon "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
 
-# ── Step 4: Install ──────────────────────────────────────────────────────────
-INSTALL_LOG="/tmp/superlite-install.log"
+                # Phase 4: Install system (50-85%)
+                echo "50" ; echo "# Installing base system (this may take a few minutes)..."
+                setup-disk -m sys /mnt >> "$INSTALL_LOG" 2>&1
 
-{
-    # Phase 1: Partition (0-25%)
-    echo "5" ; echo "# Partitioning $DISK..."
-    wipefs -a "$DISK" 2>/dev/null || true
-    parted -s "$DISK" mklabel gpt
-    parted -s "$DISK" mkpart ESP fat32 1MiB 513MiB
-    parted -s "$DISK" set 1 esp on
-    size_mb=$(blockdev --getsize64 "$DISK" | awk '{printf "%.0f", $1/1024/1024}')
-    swap_mb=$((size_mb / 10)); [ "$swap_mb" -gt 2048 ] && swap_mb=2048
-    swap_end=$((513 + swap_mb))
-    parted -s "$DISK" mkpart primary linux-swap 513MiB "${swap_end}MiB"
-    parted -s "$DISK" mkpart primary ext4 "${swap_end}MiB" 100%
-    case "$DISK" in *nvme*) sep="p";; *) sep="";; esac
+                # Phase 5: Copy desktop config (85-95%)
+                echo "85" ; echo "# Installing desktop environment..."
 
-    # Phase 2: Format (25-40%)
-    echo "25" ; echo "# Formatting partitions..."
-    mkfs.fat -F32 "${DISK}${sep}1" >> "$INSTALL_LOG" 2>&1
-    mkswap "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
-    mkfs.ext4 -F "${DISK}${sep}3" >> "$INSTALL_LOG" 2>&1
+                # Copy all dotfiles from skel to installed root
+                if [ -d /etc/skel ]; then
+                    mkdir -p /mnt/root
+                    for item in /etc/skel/.*; do
+                        name="$(basename "$item")"
+                        [ "$name" = "." ] || [ "$name" = ".." ] && continue
+                        cp -a "$item" /mnt/root/ 2>/dev/null || true
+                    done
+                fi
 
-    # Phase 3: Mount (40-50%)
-    echo "40" ; echo "# Mounting partitions..."
-    mount "${DISK}${sep}3" /mnt
-    mkdir -p /mnt/boot/efi
-    mount "${DISK}${sep}1" /mnt/boot/efi
-    swapon "${DISK}${sep}2" >> "$INSTALL_LOG" 2>&1
+                # Copy live session configs (may have runtime changes)
+                mkdir -p /mnt/root/.config
+                for item in /root/.config/*; do
+                    [ -e "$item" ] && cp -a "$item" /mnt/root/.config/ 2>/dev/null || true
+                done
 
-    # Phase 4: Install system (50-85%)
-    echo "50" ; echo "# Installing base system (this may take a few minutes)..."
-    setup-disk -m sys /mnt >> "$INSTALL_LOG" 2>&1
+                # Copy wallpapers, icons, fonts
+                [ -d /root/Pictures ] && cp -a /root/Pictures /mnt/root/ 2>/dev/null || true
+                [ -d /root/.icons ] && cp -a /root/.icons /mnt/root/ 2>/dev/null || true
 
-    # Phase 5: Copy desktop config (85-95%)
-    echo "85" ; echo "# Installing desktop environment..."
+                # Copy system-wide assets
+                [ -d /usr/share/fonts ] && cp -a /usr/share/fonts /mnt/usr/share/ 2>/dev/null || true
+                [ -d /usr/share/icons ] && cp -a /usr/share/icons /mnt/usr/share/ 2>/dev/null || true
 
-    # Copy all dotfiles from skel to installed root
-    if [ -d /etc/skel ]; then
-        mkdir -p /mnt/root
-        for item in /etc/skel/.*; do
-            name="$(basename "$item")"
-            [ "$name" = "." ] || [ "$name" = ".." ] && continue
-            cp -a "$item" /mnt/root/ 2>/dev/null || true
-        done
-    fi
+                # Copy MOTD
+                cp /etc/motd /mnt/etc/motd 2>/dev/null || true
 
-    # Copy live session configs (may have runtime changes)
-    mkdir -p /mnt/root/.config
-    for item in /root/.config/*; do
-        [ -e "$item" ] && cp -a "$item" /mnt/root/.config/ 2>/dev/null || true
-    done
+                # Ensure correct ownership
+                chroot /mnt chown -R root:root /root 2>/dev/null || true
 
-    # Copy wallpapers, icons, fonts
-    [ -d /root/Pictures ] && cp -a /root/Pictures /mnt/root/ 2>/dev/null || true
-    [ -d /root/.icons ] && cp -a /root/.icons /mnt/root/ 2>/dev/null || true
+                # Verify dotfiles installed
+                echo "# Verifying installation..."
+                _missing=""
+                for f in .profile .config/labwc/autostart .config/labwc/rc.xml .config/waybar/config .config/foot/foot.ini; do
+                    [ ! -f "/mnt/root/$f" ] && _missing="$_missing $f"
+                done
+                if [ -n "$_missing" ]; then
+                    echo "# WARNING: Missing files:$_missing" >> "$INSTALL_LOG"
+                fi
 
-    # Copy system-wide assets
-    [ -d /usr/share/fonts ] && cp -a /usr/share/fonts /mnt/usr/share/ 2>/dev/null || true
-    [ -d /usr/share/icons ] && cp -a /usr/share/icons /mnt/usr/share/ 2>/dev/null || true
+                # Phase 6: Bootloader (95-100%)
+                echo "95" ; echo "# Installing bootloader..."
+                # Mount EFI variables for grub-install
+                mount -t efivarfs efivarfs /mnt/sys/firmware/efi/efivars 2>/dev/null || true
+                # Install UEFI GRUB with --removable for fallback boot path compatibility
+                chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable >> "$INSTALL_LOG" 2>&1 || \
+                chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=superlite >> "$INSTALL_LOG" 2>&1 || \
+                chroot /mnt grub-install --target=i386-pc "$DISK" >> "$INSTALL_LOG" 2>&1 || true
+                # Also ensure fallback path exists
+                if [ -d /mnt/boot/efi/EFI/BOOT ]; then
+                    echo "# EFI fallback boot path OK" >> "$INSTALL_LOG"
+                elif [ -f /mnt/boot/efi/EFI/superlite/grubx64.efi ]; then
+                    mkdir -p /mnt/boot/efi/EFI/BOOT
+                    cp /mnt/boot/efi/EFI/superlite/grubx64.efi /mnt/boot/efi/EFI/BOOT/BOOTX64.EFI 2>/dev/null || true
+                fi
+                chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$INSTALL_LOG" 2>&1 || true
+                # Unmount efivarfs
+                umount /mnt/sys/firmware/efi/efivars 2>/dev/null || true
 
-    # Copy MOTD
-    cp /etc/motd /mnt/etc/motd 2>/dev/null || true
+                echo "100" ; echo "# Installation complete!"
+            } | yad --progress \
+                --title="$TITLE" \
+                --text="<b>Installing SuperLite OS to $DISK</b>\n\nPlease wait..." \
+                --percentage=0 --auto-close --auto-kill \
+                --button="Cancel!cancel:1" \
+                --width=$WIDTH --center 2>/dev/null
 
-    # Ensure correct ownership
-    chroot /mnt chown -R root:root /root 2>/dev/null || true
+            INSTALL_RESULT=$?
 
-    # Verify dotfiles installed
-    echo "# Verifying installation..."
-    _missing=""
-    for f in .profile .config/labwc/autostart .config/labwc/rc.xml .config/waybar/config .config/foot/foot.ini; do
-        [ ! -f "/mnt/root/$f" ] && _missing="$_missing $f"
-    done
-    if [ -n "$_missing" ]; then
-        echo "# WARNING: Missing files:$_missing" >> "$INSTALL_LOG"
-    fi
+            if [ $INSTALL_RESULT -ne 0 ]; then
+                yad --title="$TITLE" \
+                    --text="<b><span color='red'>Installation failed!</span></b>\n\nCheck the log for details:" \
+                    --text-info --filename="$INSTALL_LOG" \
+                    --button="Close:0" \
+                    --width=600 --height=400 --center 2>/dev/null
+                exit 1
+            fi
+            STEP=5
+            ;;
+        5)
+            # Done
+            yad --title="$TITLE" \
+                --text="<b><big>Installation Complete!</big></b>\n\nSuperLite OS has been installed successfully to $DISK.\n\nYou can now reboot into your new system." \
+                --image="object-select" \
+                --button="Reboot!system-reboot:0" --button="Close!window-close:1" \
+                --width=$WIDTH --center 2>/dev/null
 
-    # Phase 6: Bootloader (95-100%)
-    echo "95" ; echo "# Installing bootloader..."
-    chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi >> "$INSTALL_LOG" 2>&1 || \
-    chroot /mnt grub-install --target=i386-pc "$DISK" >> "$INSTALL_LOG" 2>&1 || true
-    chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg >> "$INSTALL_LOG" 2>&1 || true
-
-    echo "100" ; echo "# Installation complete!"
-} | yad --progress \
-    --title="$TITLE" \
-    --text="<b>Installing SuperLite OS to $DISK</b>\n\nPlease wait..." \
-    --percentage=0 --auto-close --auto-kill \
-    --button="Cancel!cancel:1" \
-    --width=$WIDTH --center 2>/dev/null
-
-INSTALL_RESULT=$?
-
-if [ $INSTALL_RESULT -ne 0 ]; then
-    # Show error with log
-    LOG_TAIL=$(tail -20 "$INSTALL_LOG" 2>/dev/null || echo "No log available")
-    yad --title="$TITLE" \
-        --text="<b><span color='red'>Installation failed!</span></b>\n\nCheck the log for details:" \
-        --text-info --filename="$INSTALL_LOG" \
-        --button="Close:0" \
-        --width=600 --height=400 --center 2>/dev/null
-    exit 1
-fi
-
-# ── Step 5: Done ─────────────────────────────────────────────────────────────
-yad --title="$TITLE" \
-    --text="<b><big>Installation Complete!</big></b>\n\nSuperLite OS has been installed successfully to $DISK.\n\nYou can now reboot into your new system." \
-    --image="object-select" \
-    --button="Reboot!system-reboot:0" --button="Close!window-close:1" \
-    --width=$WIDTH --center 2>/dev/null
-
-[ $? -eq 0 ] && reboot
+            [ $? -eq 0 ] && reboot
+            exit 0
+            ;;
+        *)
+            exit 0
+            ;;
+    esac
+done
 INSTALLER_EOF
 
 # ── TUI Partition Manager ────────────────────────────────────────────────────

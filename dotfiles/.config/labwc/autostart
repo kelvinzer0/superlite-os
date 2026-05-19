@@ -1,12 +1,18 @@
 # LabWC autostart file
 # SuperLite OS — autostart services on session launch
 
-# Wallpaper — start swaybg with default or random from ~/Pictures/wallpapers
+# Wallpaper — use wpaperd for random rotation, fallback to swaybg
 DEFAULT_WP="$HOME/Pictures/wallpapers/default.png"
 if [ -d "$HOME/Pictures/wallpapers" ] && ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} >/dev/null 2>&1; then
-    # Random wallpaper from collection
-    WP=$(ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} 2>/dev/null | shuf -n1)
-    swaybg -i "$WP" -m fill >/dev/null 2>&1 &
+    # Count wallpapers — use wpaperd if multiple, swaybg if single
+    WP_COUNT=$(ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} 2>/dev/null | wc -l)
+    if [ "$WP_COUNT" -gt 1 ] && command -v wpaperd >/dev/null 2>&1; then
+        wpaperd >/dev/null 2>&1 &
+    else
+        # Single wallpaper or wpaperd not available
+        WP=$(ls "$HOME/Pictures/wallpapers"/*.{jpg,png,webp} 2>/dev/null | shuf -n1)
+        swaybg -i "$WP" -m fill >/dev/null 2>&1 &
+    fi
 elif [ -f "$DEFAULT_WP" ]; then
     swaybg -i "$DEFAULT_WP" -m fill >/dev/null 2>&1 &
 fi

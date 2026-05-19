@@ -81,7 +81,7 @@ _docker_build() {
             set -e
             apk add --no-cache alpine-sdk build-base apk-tools alpine-conf \
                 busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
-                grub-efi grub-bios lua5.4 git
+                grub-efi grub-bios lua5.4 git go librsvg
 
             adduser -D build
             addgroup build abuild 2>/dev/null || true
@@ -135,7 +135,7 @@ _native_build() {
     apk add --no-cache \
         alpine-sdk build-base apk-tools alpine-conf \
         busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
-        grub-efi grub-bios lua5.4 git go 2>/dev/null || true
+        grub-efi grub-bios lua5.4 git go librsvg 2>/dev/null || true
 
     if ! ls ~/.abuild/build-*.rsa >/dev/null 2>&1; then
         log "Generating signing key..."

@@ -65,6 +65,7 @@ xwayland
 # --- Desktop Components ---
 waybar
 swaybg
+wlr-randr
 swayidle
 mako
 tofi
@@ -113,6 +114,7 @@ networkmanager-wifi
 # --- Boot (ISO only) ---
 grub-efi
 grub-bios
+efibootmgr
 syslinux
 squashfs-tools
 xorriso

@@ -105,6 +105,7 @@ grim
 slurp
 wtype
 yad
+librsvg
 
 # --- Networking ---
 networkmanager
@@ -122,6 +123,7 @@ thunderbird
 # --- Boot (ISO only, not runtime) ---
 grub-efi
 grub-bios
+efibootmgr
 syslinux
 squashfs-tools
 xorriso

@@ -32,6 +32,10 @@
 		<separator/>
 
 	<menu id="Display" label="Display">
+		<item label="Auto (Native)">
+			<action name="Execute"><command>wlr-randr --output eDP-1 --preferred</command></action>
+		</item>
+		<separator/>
 		<item label="1920x1080">
 			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1920x1080@60</command></action>
 		</item>
@@ -46,7 +50,7 @@
 		</item>
 		<separator/>
 		<item label="Show Current">
-			<action name="Execute"><command>foot -e sh -c "wlr-randr; echo; read -p PressEnter"</command></action>
+			<action name="Execute"><command>foot -e sh -c "wlr-randr; echo; read -p 'Press Enter to close'"</command></action>
 		</item>
 	</menu>
 
@@ -64,6 +68,10 @@
 		<separator/>
 		<item label="Stop Wallpaper">
 			<action name="Execute"><command>pkill swaybg</command></action>
+		</item>
+		<separator/>
+		<item label="Fetch Wallpapers...">
+			<action name="Execute"><command>foot -e sh -c "$HOME/.config/scripts/wallpaper-fetch.sh 5; echo; read -p 'Press Enter to close'"</command></action>
 		</item>
 	</menu>
 

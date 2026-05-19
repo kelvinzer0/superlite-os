@@ -1,9 +1,29 @@
 [Icon Theme]
 Name=SuperLite
-Comment=Clean SVG icon theme for SuperLite OS
+Comment=Clean icon theme for SuperLite OS
 Inherits=Adwaita,Papirus
 
-Directories=scalable/places,scalable/actions,scalable/devices,scalable/mimetypes,scalable/status
+Directories=48x48/places,48x48/actions,48x48/devices,48x48/mimetypes,scalable/places,scalable/actions,scalable/devices,scalable/mimetypes,scalable/status
+
+[48x48/places]
+Context=Places
+Size=48
+Type=Fixed
+
+[48x48/actions]
+Context=Actions
+Size=48
+Type=Fixed
+
+[48x48/devices]
+Context=Devices
+Size=48
+Type=Fixed
+
+[48x48/mimetypes]
+Context=MimeTypes
+Size=48
+Type=Fixed
 
 [scalable/places]
 Context=Places

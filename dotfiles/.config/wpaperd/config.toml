@@ -1,0 +1,14 @@
+# wpaperd configuration for SuperLite OS
+# Random wallpaper rotation from ~/Pictures/wallpapers
+
+[default]
+path = "~/Pictures/wallpapers"
+duration = "30m"
+sorting = "random"
+transition-time = 1000
+
+[eDP-1]
+path = "~/Pictures/wallpapers"
+duration = "30m"
+sorting = "random"
+transition-time = 1000
