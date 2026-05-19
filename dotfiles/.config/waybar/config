@@ -12,7 +12,7 @@
     "wlr/taskbar": {
         "format": "{icon}",
         "icon-size": 16,
-        "icon-theme": "Haiku",
+        "icon-theme": "SuperLite",
         "on-click": "minimize-raise",
         "on-click-middle": "close",
         "rewrite": {

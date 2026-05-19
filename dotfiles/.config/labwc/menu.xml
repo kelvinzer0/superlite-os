@@ -33,24 +33,24 @@
 
 	<menu id="Display" label="Display">
 		<item label="Auto (Native)">
-			<action name="Execute"><command>wlr-randr --output eDP-1 --preferred</command></action>
+			<action name="Execute"><command>sh -c "OUT=$(wlr-randr | head -1 | awk '{print $1}'); wlr-randr --output \"$OUT\" --preferred"</command></action>
 		</item>
 		<separator/>
 		<item label="1920x1080">
-			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1920x1080@60</command></action>
+			<action name="Execute"><command>sh -c "OUT=$(wlr-randr | head -1 | awk '{print $1}'); wlr-randr --output \"$OUT\" --mode 1920x1080@60"</command></action>
 		</item>
 		<item label="1600x900">
-			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1600x900@60</command></action>
+			<action name="Execute"><command>sh -c "OUT=$(wlr-randr | head -1 | awk '{print $1}'); wlr-randr --output \"$OUT\" --mode 1600x900@60"</command></action>
 		</item>
 		<item label="1366x768">
-			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1366x768@60</command></action>
+			<action name="Execute"><command>sh -c "OUT=$(wlr-randr | head -1 | awk '{print $1}'); wlr-randr --output \"$OUT\" --mode 1366x768@60"</command></action>
 		</item>
 		<item label="1280x720">
-			<action name="Execute"><command>wlr-randr --output eDP-1 --mode 1280x720@60</command></action>
+			<action name="Execute"><command>sh -c "OUT=$(wlr-randr | head -1 | awk '{print $1}'); wlr-randr --output \"$OUT\" --mode 1280x720@60"</command></action>
 		</item>
 		<separator/>
 		<item label="Show Current">
-			<action name="Execute"><command>foot -e sh -c "wlr-randr; echo; read -p 'Press Enter to close'"</command></action>
+			<action name="Execute"><command>foot -e sh -c "wlr-randr; echo; printf 'Press Enter to close...'; read _"</command></action>
 		</item>
 	</menu>
 
@@ -71,7 +71,7 @@
 		</item>
 		<separator/>
 		<item label="Fetch Wallpapers...">
-			<action name="Execute"><command>foot -e sh -c "$HOME/.config/scripts/wallpaper-fetch.sh 5; echo; read -p 'Press Enter to close'"</command></action>
+			<action name="Execute"><command>foot -e sh -c "$HOME/.config/scripts/wallpaper-fetch.sh 5; echo; printf 'Press Enter to close...'; read _"</command></action>
 		</item>
 	</menu>
 

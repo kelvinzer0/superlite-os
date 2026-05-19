@@ -528,7 +528,7 @@ makefile root:root 0755 "$tmp"/usr/local/bin/superlite-gui-installer <<'INSTALLE
 # SuperLite OS — GUI Installer (yad)
 # Wizard with Previous/Next navigation
 # ============================================================================
-set -e
+set +e
 
 TITLE="SuperLite OS Installer"
 WIDTH=480
