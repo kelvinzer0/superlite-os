@@ -228,6 +228,36 @@ if [ -d "$DOTFILES_DIR" ]; then
     fi
 fi
 
+# ── Build and install zapt ────────────────────────────────────────────────────
+# zapt is a Go-based multi-source package manager
+ZAPT_DIR=""
+for dir in \
+    "$SCRIPT_DIR/../../zapt" \
+    "$SCRIPT_DIR/../zapt" \
+    "/build/zapt" \
+    "./zapt"; do
+    if [ -d "$dir" ] && [ -f "$dir/main.go" ]; then
+        ZAPT_DIR="$dir"
+        break
+    fi
+done
+
+if [ -n "$ZAPT_DIR" ] && command -v go >/dev/null 2>&1; then
+    echo "Building zapt..."
+    _prev_dir=$(pwd)
+    cd "$ZAPT_DIR"
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o "$tmp"/usr/local/bin/zapt . 2>/dev/null || {
+        echo "Warning: zapt build failed"
+    }
+    cd "$_prev_dir"
+
+    # Install zapt config
+    mkdir -p "$tmp"/etc/zapt
+    if [ -f "$ZAPT_DIR/etc/sources.conf" ]; then
+        cp "$ZAPT_DIR/etc/sources.conf" "$tmp"/etc/zapt/sources.conf
+    fi
+fi
+
 # ── Append boot mode handling to labwc autostart ──────────────────────────────
 # This reads /tmp/.bootmode (written by 00-boot-mode.sh) and launches
 # the appropriate GUI app after labwc and desktop services are ready.

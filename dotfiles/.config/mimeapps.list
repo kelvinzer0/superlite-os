@@ -10,3 +10,4 @@ application/vnd.oasis.opendocument.text=open-with-web.desktop
 application/vnd.oasis.opendocument.spreadsheet=open-with-web.desktop
 application/vnd.oasis.opendocument.presentation=open-with-web.desktop
 text/csv=open-with-web.desktop
+application/vnd.debian.binary-package=zapt.desktop

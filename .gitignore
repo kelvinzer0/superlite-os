@@ -16,3 +16,8 @@ iso/EFI/
 iso/live/
 build/
 *.iso
+
+# Go build artifacts
+zapt/zapt
+zapt/zapt.exe
+zapt/*.exe

@@ -135,7 +135,7 @@ _native_build() {
     apk add --no-cache \
         alpine-sdk build-base apk-tools alpine-conf \
         busybox fakeroot syslinux xorriso squashfs-tools mtools dosfstools \
-        grub-efi grub-bios lua5.4 git 2>/dev/null || true
+        grub-efi grub-bios lua5.4 git go 2>/dev/null || true
 
     if ! ls ~/.abuild/build-*.rsa >/dev/null 2>&1; then
         log "Generating signing key..."
@@ -155,6 +155,11 @@ _native_build() {
     if [[ -d "${SCRIPT_DIR}/dotfiles" ]]; then
         ln -sf "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles 2>/dev/null || \
             cp -r "${SCRIPT_DIR}/dotfiles" /root/aports/scripts/dotfiles
+    fi
+
+    if [[ -d "${SCRIPT_DIR}/zapt" ]]; then
+        ln -sf "${SCRIPT_DIR}/zapt" /root/aports/scripts/zapt 2>/dev/null || \
+            cp -r "${SCRIPT_DIR}/zapt" /root/aports/scripts/zapt
     fi
 
     if [[ "$SETUP_ONLY" == true ]]; then

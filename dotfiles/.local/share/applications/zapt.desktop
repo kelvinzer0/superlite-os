@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=zapt Package Installer
+Comment=Install .deb packages
+Exec=zapt install %f
+Icon=package-x-generic
+Terminal=true
+MimeType=application/vnd.debian.binary-package;
+NoDisplay=true
